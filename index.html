@@ -2,321 +2,229 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Configuración para pantalla completa real en móviles y evitar zoom -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
-    <!-- iOS (iPhone/iPad) -->
+    <!-- iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Familia Dibuja">
-    <!-- Icono para iOS -->
     <link rel="apple-touch-icon" href="icono.png">
     
-    <!-- Android / PWA / Favicon -->
+    <!-- Android -->
     <meta name="theme-color" content="#3b82f6">
-    <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icono.png">
+    <link rel="manifest" id="dynamic-manifest">
 
     <title>FAMILIA DIBUJA</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <!-- Gifshot para Video -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&display=swap');
 
-        body {
-            font-family: 'Fredoka', sans-serif;
-            overscroll-behavior: none;
-            touch-action: none;
-            user-select: none;
-            -webkit-user-select: none;
-            background-color: #f8fafc;
-            /* Fijar posición para prevenir rebote en iOS */
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; font-family: 'Fredoka', sans-serif;
+            background-color: #334155; 
+            user-select: none; -webkit-user-select: none; touch-action: none;
         }
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        @keyframes bounce-in {
-            0% { transform: scale(0.8); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-bounce-in {
-            animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-
-        canvas { touch-action: none; }
-
-        .tool-btn.active {
-            background-color: #e0f2fe;
-            border-color: #3b82f6;
-            color: #2563eb;
-            transform: translateY(-2px);
-        }
-
-        .category-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .category-card:active { transform: scale(0.95); }
-
-        /* Ajustes para iPhone X/11/12+ (Notch) en horizontal */
+        #app { width: 100dvw; height: 100dvh; position: fixed; top: 0; left: 0; }
+        
         .pt-safe { padding-top: env(safe-area-inset-top); }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .pl-safe { padding-left: env(safe-area-inset-left); }
         .pr-safe { padding-right: env(safe-area-inset-right); }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .animate-bounce-in { animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes bounce-in { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .tool-btn.active { background-color: #e0f2fe; border-color: #3b82f6; color: #2563eb; transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .ui-panel { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
+        .ui-hidden-top { transform: translateY(-120%); opacity: 0; pointer-events: none; }
+        .ui-hidden-bottom { transform: translateY(120%); opacity: 0; pointer-events: none; }
+
+        #zoom-container { touch-action: none; transform-origin: 0 0; will-change: transform; }
     </style>
 </head>
-<body class="h-full w-full overflow-hidden text-slate-800 bg-slate-50">
+<body class="bg-slate-800">
 
-    <div id="app" class="h-full w-full relative">
+    <div id="app" class="relative overflow-hidden">
         
-        <!-- BARRA DE ESTADO (Offline/Online) -->
-        <div id="status-bar" class="absolute top-0 left-0 w-full z-[70] text-[10px] font-bold py-1 px-4 text-center transition-all duration-500 hidden pt-safe cursor-pointer" onclick="init()">
-            Iniciando...
+        <!-- LOGIN -->
+        <div id="login-view" class="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-600 via-fuchsia-500 to-orange-400 p-4 absolute inset-0 z-50">
+            <h1 class="text-5xl md:text-7xl font-bold text-white mb-2 text-center drop-shadow-lg tracking-wide select-none">FAMILIA DIBUJA 🎨</h1>
+            <p class="text-white text-lg mb-8 font-medium opacity-90 tracking-widest uppercase text-center">Estudio de Arte Mágico</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl" id="user-grid"></div>
+            <p class="absolute bottom-4 text-white/50 text-xs">v4.1 - Fixes</p>
         </div>
 
-        <!-- VISTA: LOGIN -->
-        <div id="login-view" class="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 p-4 absolute inset-0 z-50">
-            <h1 class="text-5xl md:text-7xl font-bold text-white mb-2 text-center drop-shadow-lg tracking-wide select-none cursor-pointer">
-                FAMILIA DIBUJA 🎨
-            </h1>
-            <p class="text-white text-lg mb-4 font-medium opacity-90 tracking-widest uppercase text-center">Estudio de Arte Mágico</p>
-            
-            <!-- Indicador de carga inicial de base de datos -->
-            <div id="db-loader" class="mb-8 text-white/80 text-sm flex items-center gap-2 bg-black/20 px-4 py-2 rounded-full">
-                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span id="loader-text">Conectando con GitHub...</span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl hidden" id="user-grid">
-                <!-- Se llena con JS -->
-            </div>
-            
-            <!-- Configuración URL (Oculta por defecto, tocar título 5 veces para mostrar) -->
-            <div id="config-panel" class="hidden absolute bottom-10 bg-white p-6 rounded-2xl shadow-2xl w-80 border-2 border-slate-200 z-[80]">
-                <h3 class="text-lg font-bold text-slate-700 mb-2">Configuración Nube</h3>
-                <p class="text-xs text-slate-500 mb-3">Ingresa la URL de tu GitHub Pages donde está el archivo db.json</p>
-                <input type="text" id="repo-url" class="w-full text-sm p-3 border-2 border-slate-200 rounded-xl mb-3 focus:border-blue-500 outline-none" placeholder="https://usuario.github.io/repo/">
-                
-                <div class="bg-yellow-50 p-2 rounded border border-yellow-200 mb-3 text-[10px] text-yellow-800 hidden" id="config-error-msg"></div>
-
-                <div class="flex gap-2">
-                    <button onclick="saveConfig()" class="flex-1 bg-blue-600 text-white py-2 rounded-xl font-bold shadow-lg active:scale-95">Guardar y Probar</button>
-                    <button onclick="document.getElementById('config-panel').classList.add('hidden')" class="px-4 bg-slate-200 text-slate-600 rounded-xl font-bold">X</button>
-                </div>
-                <button onclick="clearCache()" class="w-full mt-2 text-xs text-red-500 underline">Borrar Caché y Reiniciar</button>
-            </div>
-        </div>
-
-        <!-- VISTA: HOME (SELECCIÓN) -->
+        <!-- HOME -->
         <div id="home-view" class="h-full w-full flex-col bg-slate-50 hidden absolute inset-0 z-40 pt-safe pl-safe pr-safe">
-            <!-- Header -->
             <div class="bg-white px-4 py-3 shadow-md flex justify-between items-center z-10 sticky top-0 rounded-b-xl mx-2 mt-2">
                 <div class="flex items-center gap-3">
-                    <button onclick="navigate('login')" class="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-600">
-                        <i data-lucide="chevron-left" class="w-7 h-7"></i>
-                    </button>
-                    <div>
-                        <h2 class="text-xl font-bold leading-none text-slate-700">Hola, <span id="user-name-display" class="text-fuchsia-600 font-black"></span></h2>
-                    </div>
+                    <button onclick="navigate('login')" class="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-600"><i data-lucide="chevron-left" class="w-7 h-7"></i></button>
+                    <h2 class="text-xl font-bold leading-none text-slate-700">Hola, <span id="user-name-display" class="text-fuchsia-600 font-black"></span></h2>
                 </div>
                 <button onclick="navigate('gallery')" class="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-4 py-2 rounded-full font-bold shadow-lg active:scale-95 transition-all">
-                    <i data-lucide="image" class="w-5 h-5"></i>
-                    <span class="hidden sm:inline">Galería</span>
+                    <i data-lucide="image" class="w-5 h-5"></i> <span class="hidden sm:inline">Galería</span>
                 </button>
             </div>
-
-            <!-- Content -->
             <div class="flex-1 overflow-y-auto p-4 pb-32">
-                <!-- Categorías -->
                 <div id="categories-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                    <!-- Categoría: Libre -->
                     <button onclick="startDrawing({id:'blank'})" class="category-card bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-100 flex items-center gap-4 hover:border-orange-300 hover:shadow-md group">
-                        <div class="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <i data-lucide="pencil" class="w-8 h-8 text-orange-500"></i>
-                        </div>
-                        <div class="text-left">
-                            <h3 class="font-bold text-lg text-slate-700">Pizarrón Blanco</h3>
-                            <p class="text-xs text-slate-400">Dibuja lo que quieras</p>
-                        </div>
+                        <div class="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="pencil" class="w-8 h-8 text-orange-500"></i></div>
+                        <div class="text-left"><h3 class="font-bold text-lg text-slate-700">Pizarrón Blanco</h3><p class="text-xs text-slate-400">Dibuja lo que quieras</p></div>
                     </button>
-                    <!-- Las demás categorías se generan con JS -->
                 </div>
-
                 <div id="category-detail-view" class="hidden pb-20">
-                    <button onclick="showCategories()" class="mb-4 flex items-center gap-2 text-slate-500 font-bold hover:text-slate-700 bg-white px-4 py-2 rounded-full shadow-sm">
-                        <i data-lucide="arrow-left" class="w-5 h-5"></i> Volver a Grupos
+                    <button onclick="showCategories()" class="mb-4 flex items-center gap-2 text-slate-500 font-bold hover:text-slate-700 bg-white px-4 py-2 rounded-full shadow-sm"><i data-lucide="arrow-left" class="w-5 h-5"></i> Volver</button>
+                    <h2 id="category-title" class="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3 capitalize"></h2>
+                    <div id="templates-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CANVAS (DIBUJO) -->
+        <div id="canvas-view" class="h-full w-full hidden absolute inset-0 z-50 bg-slate-800 overflow-hidden">
+            
+            <!-- HEADER TOOLS -->
+            <div id="canvas-header" class="ui-panel absolute top-0 left-0 right-0 z-30 pt-safe px-4 pointer-events-none">
+                <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-2 flex items-center justify-between gap-2 mt-2 pointer-events-auto border border-white/20 mx-auto max-w-4xl">
+                    <!-- BOTÓN X CORREGIDO -->
+                    <button onclick="exitCanvas()" class="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200 active:scale-90 transition-transform shadow-sm">
+                        <i data-lucide="x" class="w-6 h-6 stroke-[3px]"></i>
                     </button>
-                    <h2 id="category-title" class="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3"></h2>
-                    <div id="templates-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                        <!-- Templates JS -->
+                    
+                    <div class="flex gap-1 bg-slate-100 rounded-full p-1 shadow-inner">
+                        <button onclick="canvasUndo()" class="p-2 rounded-full hover:bg-slate-200 active:scale-90 text-slate-600"><i data-lucide="undo" class="w-5 h-5"></i></button>
+                        <button onclick="canvasRedo()" class="p-2 rounded-full hover:bg-slate-200 active:scale-90 text-slate-600"><i data-lucide="redo" class="w-5 h-5"></i></button>
+                    </div>
+
+                    <div class="flex gap-1 bg-slate-100 rounded-full p-1 overflow-x-auto no-scrollbar max-w-[40vw] shadow-inner">
+                        <button onclick="setTool('pencil')" id="tool-pencil" class="tool-btn active p-2 rounded-full border border-transparent transition-all"><i data-lucide="pencil" class="w-5 h-5"></i></button>
+                        <button onclick="setTool('marker')" id="tool-marker" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="highlighter" class="w-5 h-5"></i></button>
+                        <button onclick="setTool('spray')" id="tool-spray" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="spray-can" class="w-5 h-5"></i></button>
+                        <button onclick="setTool('rainbow')" id="tool-rainbow" class="tool-btn p-2 rounded-full border border-transparent transition-all text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-green-500 to-blue-500"><i data-lucide="rainbow" class="w-5 h-5 text-purple-500"></i></button>
+                        <button onclick="setTool('neon')" id="tool-neon" class="tool-btn p-2 rounded-full border border-transparent transition-all text-fuchsia-500"><i data-lucide="sparkles" class="w-5 h-5"></i></button>
+                        <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="eraser" class="w-5 h-5"></i></button>
+                    </div>
+
+                    <button onclick="saveCanvas()" class="bg-green-500 text-white p-2 px-4 rounded-full font-bold shadow-lg active:scale-95 flex items-center gap-2 hover:bg-green-600 transition-colors">
+                        <i data-lucide="save" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- AREA DE DIBUJO -->
+            <div id="drawing-area" class="w-full h-full flex items-center justify-center touch-none bg-slate-800">
+                <div id="zoom-container" class="relative shadow-2xl">
+                    <canvas id="drawing-canvas" class="bg-white cursor-crosshair touch-none rounded-sm"></canvas>
+                    <div id="template-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center z-10"></div>
+                </div>
+            </div>
+
+            <!-- FOOTER TOOLS -->
+            <div id="canvas-footer" class="ui-panel absolute bottom-0 left-0 right-0 z-30 pb-safe px-4 pointer-events-none">
+                <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-3 flex flex-col gap-3 mb-2 pointer-events-auto border border-white/20 mx-auto max-w-4xl">
+                    <div class="flex gap-3 overflow-x-auto pb-1 no-scrollbar px-1 justify-center" id="color-palette"></div>
+                    <div class="flex justify-center gap-6 items-center border-t border-slate-100 pt-2">
+                        <button onclick="setSize(5)" class="w-4 h-4 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
+                        <button onclick="setSize(12)" class="w-6 h-6 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
+                        <button onclick="setSize(25)" class="w-10 h-10 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
+                        <button onclick="resetZoom()" class="text-xs text-slate-400 font-bold ml-4 bg-slate-100 px-2 py-1 rounded">Reset Zoom</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- VISTA: CANVAS (DIBUJO) -->
-        <div id="canvas-view" class="h-full w-full flex-col hidden absolute inset-0 z-50 bg-slate-200 pt-safe pl-safe pr-safe pb-safe">
-            <!-- Header Tools -->
-            <div class="bg-white px-2 py-2 shadow-sm flex items-center justify-between gap-2 z-20 rounded-b-xl mx-2 mt-1">
-                <button onclick="confirmExitCanvas()" class="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-100">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-                
-                <div class="flex gap-1 bg-slate-100 rounded-full p-1">
-                    <button onclick="canvasUndo()" class="p-2 rounded-full hover:bg-slate-200 active:scale-90 text-slate-600"><i data-lucide="undo" class="w-5 h-5"></i></button>
-                    <button onclick="canvasRedo()" class="p-2 rounded-full hover:bg-slate-200 active:scale-90 text-slate-600"><i data-lucide="redo" class="w-5 h-5"></i></button>
-                </div>
-
-                <!-- Herramientas -->
-                <div class="flex gap-1 bg-slate-100 rounded-full p-1 overflow-x-auto no-scrollbar max-w-[40vw]">
-                    <button onclick="setTool('pencil')" id="tool-pencil" class="tool-btn active p-2 rounded-full border border-transparent transition-all"><i data-lucide="pencil" class="w-5 h-5"></i></button>
-                    <button onclick="setTool('marker')" id="tool-marker" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="highlighter" class="w-5 h-5"></i></button>
-                    <button onclick="setTool('spray')" id="tool-spray" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="spray-can" class="w-5 h-5"></i></button>
-                    <button onclick="setTool('neon')" id="tool-neon" class="tool-btn p-2 rounded-full border border-transparent transition-all text-fuchsia-500"><i data-lucide="sparkles" class="w-5 h-5"></i></button>
-                    <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="eraser" class="w-5 h-5"></i></button>
-                </div>
-
-                <button onclick="saveCanvas()" class="bg-green-500 text-white p-2 px-4 rounded-full font-bold shadow active:scale-95 flex items-center gap-2">
-                    <i data-lucide="save" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <!-- Canvas Area -->
-            <div class="relative flex-1 bg-gray-300 overflow-hidden flex items-center justify-center shadow-inner touch-none m-2 rounded-xl">
-                <canvas id="drawing-canvas" class="bg-white shadow-2xl cursor-crosshair touch-none absolute inset-0 rounded-xl"></canvas>
-                <!-- Capa superior para imágenes PNG (contornos) -->
-                <div id="template-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center z-10"></div>
-            </div>
-
-            <!-- Footer Tools -->
-            <div class="bg-white p-3 pb-4 shadow-up z-20 flex flex-col gap-3 rounded-t-2xl mx-2 mb-0">
-                <!-- Colors -->
-                <div class="flex gap-3 overflow-x-auto pb-2 no-scrollbar px-2" id="color-palette"></div>
-                <!-- Sizes -->
-                <div class="flex justify-center gap-6 items-center">
-                    <button onclick="setSize(5)" class="w-4 h-4 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
-                    <button onclick="setSize(12)" class="w-6 h-6 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
-                    <button onclick="setSize(25)" class="w-10 h-10 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
-                </div>
-            </div>
-        </div>
-
-        <!-- VISTA: GALERÍA -->
+        <!-- GALERÍA -->
         <div id="gallery-view" class="h-full w-full flex-col hidden absolute inset-0 z-40 bg-slate-50 pt-safe pl-safe pr-safe">
-            <div class="bg-white p-4 shadow-md flex justify-between items-center sticky top-0 z-30 rounded-b-xl mx-2 mt-2">
+            <div class="bg-white px-4 py-3 shadow-md flex justify-between items-center z-10 sticky top-0 rounded-b-xl mx-2 mt-2">
                 <button onclick="navigate('home')" class="p-2 bg-slate-100 rounded-full text-slate-700"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
                 <h2 class="text-xl font-bold text-slate-800">Galería</h2>
                 <div class="w-10"></div>
             </div>
-
             <div class="flex-1 overflow-y-auto p-4 pb-32">
                 <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-2xl mb-6 shadow-lg text-white">
                     <div class="flex justify-between items-center mb-2">
-                        <h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="clapperboard" class="w-5 h-5"></i> Crear Película</h3>
-                        <span id="selection-count" class="text-xs bg-white/20 px-2 py-1 rounded-full">0 seleccionados</span>
+                        <h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="clapperboard" class="w-5 h-5"></i> Película</h3>
+                        <span id="selection-count" class="text-xs bg-white/20 px-2 py-1 rounded-full">0 selec.</span>
                     </div>
-                    <button id="btn-create-video" onclick="createVideo()" disabled class="w-full bg-white text-blue-600 py-2 rounded-lg font-bold shadow-sm disabled:opacity-50 flex justify-center items-center gap-2">
-                        ¡Acción! <i data-lucide="play" class="w-4 h-4 fill-current"></i>
-                    </button>
+                    <button id="btn-create-video" onclick="createVideo()" disabled class="w-full bg-white text-blue-600 py-2 rounded-lg font-bold shadow-sm disabled:opacity-50 flex justify-center items-center gap-2">¡Acción! <i data-lucide="play" class="w-4 h-4 fill-current"></i></button>
                 </div>
-
                 <div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-20"></div>
-                <div id="empty-gallery" class="hidden text-center text-slate-400 mt-20"><i data-lucide="image" class="w-16 h-16 mx-auto mb-4 opacity-50"></i><p>Tu galería está vacía.</p></div>
+                <div id="empty-gallery" class="hidden text-center text-slate-400 mt-20"><i data-lucide="image" class="w-16 h-16 mx-auto mb-4 opacity-50"></i><p>Galería vacía.</p></div>
             </div>
         </div>
         
-        <!-- MODAL: VIDEO -->
+        <!-- VIDEO MODAL -->
         <div id="video-modal" class="fixed inset-0 z-[80] bg-black/95 hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
-            <h3 class="text-white text-3xl font-bold mb-6 animate-bounce text-center">¡Tu Obra Maestra! 🎬</h3>
+            <h3 class="text-white text-3xl font-bold mb-6 animate-bounce text-center">¡Obra Maestra! 🎬</h3>
             <img id="generated-gif" src="" class="max-w-full max-h-[50vh] border-8 border-white rounded-xl shadow-2xl mb-8 bg-white rotate-1">
             <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-                 <a id="download-gif-link" href="#" download="mi-pelicula.gif" class="flex-1 bg-green-500 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-600 text-center flex items-center justify-center gap-2 shadow-lg hover:-translate-y-1 transition-transform">
-                    <i data-lucide="download" class="w-6 h-6"></i> Guardar
-                </a>
-                <button onclick="closeVideoModal()" class="flex-1 bg-slate-700 text-white py-4 rounded-2xl font-bold text-lg hover:bg-slate-600 text-center shadow-lg">Cerrar</button>
+                 <a id="download-gif-link" href="#" download="mi-pelicula.gif" class="flex-1 bg-green-500 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-600 text-center flex items-center justify-center gap-2 shadow-lg">Descargar</a>
+                <button onclick="closeVideoModal()" class="flex-1 bg-slate-700 text-white py-4 rounded-2xl font-bold text-lg">Cerrar</button>
             </div>
         </div>
     </div>
 
 <script>
     // --- CONFIGURACIÓN ---
-    // IMPORTANTE: El usuario debe configurar la URL tocando el título 5 veces
-    const DB_NAME = 'FamiliaDibujaDB';
-    const DB_VERSION = 1;
-    const USERS = ['ALEXANDER', 'DANIEL', 'ROBERTO', 'BOMBON', 'YERIS'];
-    const COLORS = ['#000000', '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#FF00FF', '#FFFFFF', '#8B4513', '#00FFFF', '#FF1493', '#32CD32', '#F08080', '#20B2AA'];
-    
-    // Configuración de Categorías
+    const MIS_IMAGENES = {
+        'naturaleza': 5, 'superheroe': 3, 'princesas': 3, 'animales': 3, 'vehiculos': 3, 'paisajes': 3
+    };
+
     const CAT_META = {
+        'naturaleza': { name: 'Naturaleza', icon: 'flower', color: 'bg-lime-100 text-lime-600' },
         'superheroe': { name: 'Superhéroes', icon: 'shield', color: 'bg-blue-100 text-blue-600' },
         'princesas': { name: 'Princesas', icon: 'crown', color: 'bg-pink-100 text-pink-500' },
         'animales': { name: 'Animales', icon: 'cat', color: 'bg-yellow-100 text-yellow-600' },
         'vehiculos': { name: 'Vehículos', icon: 'car', color: 'bg-green-100 text-green-600' },
         'paisajes': { name: 'Paisajes', icon: 'mountain-snow', color: 'bg-teal-100 text-teal-600' },
-        'naturaleza': { name: 'Naturaleza', icon: 'flower', color: 'bg-lime-100 text-lime-600' },
         'otros': { name: 'Varios', icon: 'star', color: 'bg-slate-100 text-slate-600' }
     };
 
-    const DEFAULT_TEMPLATES = [
-        { id: 'def_car', cat: 'vehiculos', name: 'Coche', type: 'svg', content: `<path d="M50 300 H450 V350 H50 Z" /><circle cx="120" cy="350" r="40" /><circle cx="380" cy="350" r="40" /><path d="M100 300 L130 200 H370 L400 300" />` }
-    ];
+    function injectManifest() {
+        const manifest = { "name": "Familia Dibuja", "short_name": "Dibujos", "start_url": ".", "display": "standalone", "background_color": "#3b82f6", "theme_color": "#3b82f6", "orientation": "landscape", "icons": [{ "src": "icono.png", "sizes": "192x192", "type": "image/png" }] };
+        const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        document.getElementById('dynamic-manifest').setAttribute('href', URL.createObjectURL(blob));
+    }
 
-    let state = {
-        user: null,
-        repoUrl: localStorage.getItem('repo_url') || '',
-        templates: [], 
-        gallery: [],
-        tool: 'pencil',
-        color: '#000000',
-        size: 5,
-        history: [],
-        historyIndex: -1,
-        selectedForVideo: [],
-        drawing: false,
-        currentTemplate: null
-    };
+    const DB_NAME = 'FamiliaDibujaDBv4';
+    const DB_VERSION = 1;
+    const USERS = ['ALEXANDER', 'DANIEL', 'ROBERTO', 'BOMBON', 'YERIS'];
+    const COLORS = ['#000000', '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#FF00FF', '#FFFFFF', '#8B4513', '#00FFFF', '#FF1493', '#32CD32', '#F08080', '#20B2AA'];
 
-    // --- BASE DE DATOS LOCAL (IndexedDB) ---
+    let state = { user: null, templates: [], gallery: [], tool: 'pencil', color: '#000000', size: 5, history: [], historyIndex: -1, selectedForVideo: [], drawing: false, currentTemplate: null };
+    let zoomState = { scale: 1, panning: false, pointX: 0, pointY: 0, startX: 0, startY: 0 };
+
+    function generateTemplates() {
+        const templates = [];
+        for (const [cat, count] of Object.entries(MIS_IMAGENES)) {
+            for (let i = 1; i <= count; i++) {
+                templates.push({ id: `${cat}_${i}`, cat: cat, name: `${cat} ${i}`, file: `${cat}_${i}.png`, type: 'png' });
+            }
+        }
+        templates.push({ id: 'def_car', cat: 'vehiculos', name: 'Coche Veloz', type: 'svg', content: `<path d="M50 300 H450 V350 H50 Z" /><circle cx="120" cy="350" r="40" /><circle cx="380" cy="350" r="40" /><path d="M100 300 L130 200 H370 L400 300" />` });
+        return templates;
+    }
+
     const db = {
-        open: () => new Promise((resolve, reject) => {
+        open: () => new Promise((resolve) => {
             const req = indexedDB.open(DB_NAME, DB_VERSION);
             req.onupgradeneeded = (e) => {
                 const d = e.target.result;
-                if (!d.objectStoreNames.contains('images')) d.createObjectStore('images', { keyPath: 'id' });
                 if (!d.objectStoreNames.contains('gallery')) d.createObjectStore('gallery', { keyPath: 'id' });
             };
             req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
         }),
-        putImage: async (id, blob) => {
-            const d = await db.open();
-            return new Promise((resolve, reject) => {
-                const tx = d.transaction('images', 'readwrite');
-                tx.objectStore('images').put({ id, blob });
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject();
-            });
-        },
-        getImage: async (id) => {
-            const d = await db.open();
-            return new Promise((resolve) => {
-                const req = d.transaction('images', 'readonly').objectStore('images').get(id);
-                req.onsuccess = () => resolve(req.result ? req.result.blob : null);
-                req.onerror = () => resolve(null);
-            });
-        },
         getAllGallery: async () => {
              const d = await db.open();
              return new Promise(resolve => {
@@ -326,11 +234,8 @@
         },
         saveGalleryItem: async (item) => {
             const d = await db.open();
-            return new Promise(resolve => {
-                const tx = d.transaction('gallery', 'readwrite');
-                tx.objectStore('gallery').put(item);
-                tx.oncomplete = () => resolve();
-            });
+            const tx = d.transaction('gallery', 'readwrite');
+            tx.objectStore('gallery').put(item);
         },
         deleteGalleryItem: async (id) => {
             const d = await db.open();
@@ -339,121 +244,13 @@
         }
     };
 
-    // --- SINCRONIZACIÓN ---
-    async function syncDatabase() {
-        if (!state.repoUrl) {
-            document.getElementById('loader-text').innerText = 'Configura tu GitHub tocando el título...';
-            return []; 
-        }
-
-        showStatus('Conectando...', 'bg-blue-500');
-        const url = state.repoUrl.endsWith('/') ? state.repoUrl : state.repoUrl + '/';
-        const dbUrl = `${url}db.json?t=${Date.now()}`;
-
-        try {
-            // 1. Descargar db.json con manejo de errores específico
-            const response = await fetch(dbUrl);
-            
-            if (response.status === 404) {
-                throw new Error('404: No se encontró db.json. Verifica la URL.');
-            }
-            if (!response.ok) {
-                throw new Error(`Error de red: ${response.status}`);
-            }
-
-            // Intento de parseo de JSON
-            let data;
-            try {
-                data = await response.json();
-            } catch (jsonErr) {
-                throw new Error('Error de formato en db.json. Revisa comas y comillas.');
-            }
-            
-            // 2. Procesar imágenes
-            let newCount = 0;
-            if (data.templates && Array.isArray(data.templates)) {
-                for (const item of data.templates) {
-                    try {
-                        const existing = await db.getImage(item.id);
-                        if (!existing) {
-                            showStatus(`Bajando: ${item.name}`, 'bg-purple-500');
-                            const imgResp = await fetch(`${url}${item.file}`);
-                            if (imgResp.ok) {
-                                const blob = await imgResp.blob();
-                                await db.putImage(item.id, blob);
-                                newCount++;
-                            } else {
-                                console.warn(`No se encontró imagen: ${item.file}`);
-                            }
-                        }
-                    } catch (imgErr) {
-                        console.warn(`Error bajando imagen ${item.name}`, imgErr);
-                    }
-                }
-                
-                localStorage.setItem('templates_meta', JSON.stringify(data.templates));
-                showStatus(newCount > 0 ? `¡${newCount} nuevos dibujos!` : 'Todo al día', 'bg-green-600');
-                setTimeout(hideStatus, 3000);
-                return data.templates;
-            } else {
-                throw new Error('db.json no tiene lista de templates');
-            }
-
-        } catch (e) {
-            console.error(e);
-            let userMsg = 'Modo Offline (Sin cambios)';
-            let color = 'bg-slate-500';
-
-            // Mensajes específicos para el usuario
-            if (e.message.includes('404')) {
-                userMsg = 'Error: URL incorrecta o archivo no encontrado';
-                color = 'bg-red-500';
-                showConfigError(userMsg);
-            } else if (e.message.includes('formato')) {
-                userMsg = 'Error: db.json mal escrito (Sintaxis)';
-                color = 'bg-red-500';
-                showConfigError(userMsg);
-            } else if (e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
-                userMsg = 'Sin Internet: Modo Offline';
-            }
-
-            showStatus(userMsg, color);
-            if (!color.includes('red')) setTimeout(hideStatus, 4000);
-            
-            return JSON.parse(localStorage.getItem('templates_meta') || '[]');
-        }
-    }
-
-    function showConfigError(msg) {
-        const el = document.getElementById('config-error-msg');
-        el.innerText = msg;
-        el.classList.remove('hidden');
-        // Abrir panel si es error grave
-        setTimeout(() => {
-             document.getElementById('config-panel').classList.remove('hidden');
-        }, 1000);
-    }
-
-    function showStatus(msg, colorClass) {
-        const bar = document.getElementById('status-bar');
-        bar.textContent = msg;
-        bar.className = `absolute top-0 left-0 w-full z-[70] text-[10px] font-bold py-1 px-4 text-center text-white transition-all duration-500 pt-safe ${colorClass}`;
-        bar.classList.remove('hidden');
-    }
-    function hideStatus() { document.getElementById('status-bar').classList.add('hidden'); }
-
-    // --- INICIALIZACIÓN ---
     async function init() {
+        injectManifest();
         lucide.createIcons();
         renderLogin();
-
         state.gallery = await db.getAllGallery();
         state.gallery.sort((a,b) => b.id - a.id);
-
-        const externalTemplates = await syncDatabase();
-        state.templates = [...externalTemplates, ...DEFAULT_TEMPLATES];
-        
-        document.getElementById('db-loader').classList.add('hidden');
+        state.templates = generateTemplates();
         document.getElementById('user-grid').classList.remove('hidden');
         document.getElementById('user-grid').classList.add('grid');
     }
@@ -462,7 +259,10 @@
         views: { login: 'login-view', home: 'home-view', canvas: 'canvas-view', gallery: 'gallery-view' },
         canvas: document.getElementById('drawing-canvas'),
         ctx: document.getElementById('drawing-canvas').getContext('2d'),
-        overlay: document.getElementById('template-overlay')
+        overlay: document.getElementById('template-overlay'),
+        zoomContainer: document.getElementById('zoom-container'),
+        header: document.getElementById('canvas-header'),
+        footer: document.getElementById('canvas-footer')
     };
 
     function navigate(viewId) {
@@ -472,10 +272,9 @@
         });
         document.getElementById(dom.views[viewId]).classList.remove('hidden');
         document.getElementById(dom.views[viewId]).classList.add('flex');
-        
         if (viewId === 'gallery') { state.selectedForVideo = []; renderGallery(); }
         if (viewId === 'home') { renderHomeCategories(); }
-        if (viewId === 'canvas') { resizeCanvas(); }
+        if (viewId === 'canvas') { setTimeout(initCanvasSize, 50); }
     }
 
     function renderLogin() {
@@ -488,62 +287,17 @@
             </button>
         `).join('');
         lucide.createIcons();
-        
-        // Mostrar config al tocar titulo 5 veces
-        let clicks = 0;
-        document.querySelector('h1').onclick = () => {
-            clicks++;
-            if(clicks === 5) {
-                document.getElementById('config-panel').classList.remove('hidden');
-                document.getElementById('repo-url').value = state.repoUrl;
-            }
-        };
     }
-
-    function saveConfig() {
-        const url = document.getElementById('repo-url').value.trim();
-        if(url) {
-            state.repoUrl = url;
-            localStorage.setItem('repo_url', url);
-            document.getElementById('config-error-msg').classList.add('hidden');
-            // Forzar recarga completa para limpiar estados raros
-            location.reload(); 
-        }
-    }
-    
-    function clearCache() {
-        localStorage.removeItem('repo_url');
-        localStorage.removeItem('templates_meta');
-        location.reload();
-    }
-
-    function login(name) {
-        state.user = name;
-        document.getElementById('user-name-display').innerText = name;
-        navigate('home');
-    }
+    function login(name) { state.user = name; document.getElementById('user-name-display').innerText = name; navigate('home'); }
 
     function renderHomeCategories() {
         const container = document.getElementById('categories-list');
         const staticHtml = container.innerHTML.split('<!-- Las demás')[0];
-        
         const availableCats = new Set(state.templates.map(t => t.cat || 'otros'));
-        
         const dynamicHtml = Array.from(availableCats).map(catKey => {
             const meta = CAT_META[catKey] || CAT_META['otros'];
-            return `
-            <button onclick="openCategory('${catKey}')" class="category-card bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-100 flex items-center gap-4 hover:border-blue-300 hover:shadow-md group">
-                <div class="w-16 h-16 rounded-2xl ${meta.color} flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <i data-lucide="${meta.icon}" class="w-8 h-8"></i>
-                </div>
-                <div class="text-left">
-                    <h3 class="font-bold text-lg text-slate-700 capitalize">${meta.name}</h3>
-                    <p class="text-xs text-slate-400">Ver dibujos</p>
-                </div>
-            </button>
-            `;
+            return `<button onclick="openCategory('${catKey}')" class="category-card bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-100 flex items-center gap-4 hover:border-blue-300 hover:shadow-md group"><div class="w-16 h-16 rounded-2xl ${meta.color} flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="${meta.icon}" class="w-8 h-8"></i></div><div class="text-left"><h3 class="font-bold text-lg text-slate-700 capitalize">${meta.name}</h3><p class="text-xs text-slate-400">Ver dibujos</p></div></button>`;
         }).join('');
-
         container.innerHTML = staticHtml + dynamicHtml;
         lucide.createIcons();
     }
@@ -551,272 +305,187 @@
     function openCategory(catKey) {
         document.getElementById('categories-list').classList.add('hidden');
         document.getElementById('category-detail-view').classList.remove('hidden');
-        
-        const meta = CAT_META[catKey] || CAT_META['otros'];
-        document.getElementById('category-title').innerHTML = `
-            <div class="p-2 rounded-xl ${meta.color}"><i data-lucide="${meta.icon}"></i></div> ${meta.name}
-        `;
-
+        document.getElementById('category-title').innerText = CAT_META[catKey]?.name || catKey;
         const templates = state.templates.filter(t => (t.cat || 'otros') === catKey);
-        renderTemplateGrid(templates);
-    }
-
-    function showCategories() {
-        document.getElementById('categories-list').classList.remove('hidden');
-        document.getElementById('category-detail-view').classList.add('hidden');
-    }
-
-    async function renderTemplateGrid(templates) {
         const grid = document.getElementById('templates-grid');
-        grid.innerHTML = '<div class="col-span-full text-center text-slate-400">Cargando...</div>';
-        
-        const itemsHtml = await Promise.all(templates.map(async (t) => {
-            let src = '';
-            
-            if (t.type === 'svg') {
-                src = `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" stroke="black" stroke-width="8" fill="none">${t.content}</svg>`)}`;
-            } else {
-                const blob = await db.getImage(t.id);
-                if (blob) src = URL.createObjectURL(blob);
-            }
-
-            return `
-            <button onclick='startDrawing(${JSON.stringify(t)})' class="w-full bg-white p-2 rounded-3xl shadow border-2 border-slate-100 hover:border-blue-400 hover:shadow-lg transition-all flex flex-col items-center gap-2 group animate-bounce-in">
-                <div class="w-full aspect-square bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center p-2 relative">
-                    ${src ? `<img src="${src}" class="w-full h-full object-contain pointer-events-none select-none">` : '<span class="text-xs text-red-400">?</span>'}
-                </div>
-                <span class="font-bold text-slate-600 text-sm truncate w-full text-center">${t.name}</span>
-            </button>
-            `;
-        }));
-
-        grid.innerHTML = itemsHtml.join('');
+        grid.innerHTML = templates.map(t => {
+            let imgContent = t.type === 'svg' ? `<img src="data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" stroke="black" stroke-width="8" fill="none">${t.content}</svg>`)}" class="w-full h-full object-contain pointer-events-none select-none">` : `<img src="${t.file}" class="w-full h-full object-contain pointer-events-none select-none" onerror="this.src='';this.parentElement.innerHTML='<span class=\\'text-xs text-red-400\\'>Sin Imagen</span>'">`;
+            return `<button onclick='startDrawing(${JSON.stringify(t)})' class="w-full bg-white p-2 rounded-3xl shadow border-2 border-slate-100 hover:border-blue-400 hover:shadow-lg transition-all flex flex-col items-center gap-2 group animate-bounce-in"><div class="w-full aspect-square bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center p-2 relative">${imgContent}</div><span class="font-bold text-slate-600 text-sm truncate w-full text-center capitalize">${t.name}</span></button>`;
+        }).join('');
     }
+    function showCategories() { document.getElementById('categories-list').classList.remove('hidden'); document.getElementById('category-detail-view').classList.add('hidden'); }
 
+    // --- CANVAS LOGIC & ZOOM ---
     async function startDrawing(template) {
         state.currentTemplate = template;
-        state.history = [];
-        state.historyIndex = -1;
+        state.history = []; state.historyIndex = -1;
         setTool('pencil');
-        
         navigate('canvas');
-        
-        // Wait for canvas to be visible before resizing
-        setTimeout(() => resizeCanvas(), 50);
-        
         dom.overlay.innerHTML = '';
-        
         if (template.id !== 'blank') {
             const img = new Image();
             img.className = "w-full h-full object-contain opacity-90 pointer-events-none select-none";
-            
-            if (template.type === 'svg') {
-                img.src = 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500" stroke="black" stroke-width="8" fill="none">${template.content}</svg>`);
-                dom.overlay.appendChild(img);
-            } else {
-                const blob = await db.getImage(template.id);
-                if (blob) {
-                    img.src = URL.createObjectURL(blob);
-                    dom.overlay.appendChild(img);
-                }
-            }
+            img.src = template.type === 'svg' ? 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500" stroke="black" stroke-width="8" fill="none">${template.content}</svg>`) : template.file;
+            dom.overlay.appendChild(img);
         }
-        
         renderPalette();
-        saveHistory(); 
+        setTimeout(() => saveHistory(), 100);
+        resetZoom();
     }
 
-    // --- CANVAS UTILS ---
-    function resizeCanvas() {
-        const parent = dom.canvas.parentElement;
-        if (!parent) return;
-        dom.canvas.width = parent.clientWidth;
-        dom.canvas.height = parent.clientHeight;
-        dom.ctx.lineCap = 'round';
-        dom.ctx.lineJoin = 'round';
-        // Only fill white if new canvas or blank
+    function initCanvasSize() {
+        const container = document.getElementById('drawing-area');
+        const width = container.clientWidth - 40; 
+        const height = container.clientHeight - 40;
+        
+        dom.canvas.width = width;
+        dom.canvas.height = height;
+        dom.zoomContainer.style.width = width + 'px';
+        dom.zoomContainer.style.height = height + 'px';
+        
+        dom.ctx.lineCap = 'round'; dom.ctx.lineJoin = 'round';
         if (state.historyIndex === -1) {
-            dom.ctx.fillStyle = 'white';
-            dom.ctx.fillRect(0,0, dom.canvas.width, dom.canvas.height);
-        } else {
-            // If resizing during drawing, redraw history (simplified)
+            dom.ctx.fillStyle = 'white'; dom.ctx.fillRect(0,0, dom.canvas.width, dom.canvas.height);
+        } else if (state.history[state.historyIndex]) {
             restoreImage(state.history[state.historyIndex]);
         }
         updateCtx();
     }
-    
-    // Add resize listener
-    window.addEventListener('resize', () => {
-        if (!document.getElementById('canvas-view').classList.contains('hidden')) {
-             // Optional: Debounce this in production
-             resizeCanvas();
-        }
-    });
 
-    function setTool(toolName) {
-        state.tool = toolName;
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(`tool-${toolName}`).classList.add('active');
-        updateCtx();
+    function resetZoom() {
+        zoomState = { scale: 1, panning: false, pointX: 0, pointY: 0, startX: 0, startY: 0 };
+        updateZoomTransform();
     }
 
+    function updateZoomTransform() {
+        dom.zoomContainer.style.transform = `translate(${zoomState.pointX}px, ${zoomState.pointY}px) scale(${zoomState.scale})`;
+    }
+
+    // MULTITOUCH
+    const touchHandler = document.getElementById('drawing-area');
+    let initialDist = 0; let initialScale = 1;
+
+    touchHandler.addEventListener('touchstart', e => {
+        if (e.touches.length === 2) {
+            zoomState.panning = true;
+            initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            initialScale = zoomState.scale;
+        } else if (e.touches.length === 1 && !zoomState.panning) {
+            hideUI();
+            state.drawing = true;
+            const pos = getPos(e.touches[0]);
+            dom.ctx.beginPath();
+            dom.ctx.moveTo(pos.x, pos.y);
+            if(state.tool === 'spray') { spray(pos); state.sprayInterval = setInterval(()=>spray(getPos(e.touches[0])), 50); }
+        }
+    }, {passive: false});
+
+    touchHandler.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (e.touches.length === 2 && zoomState.panning) {
+            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            zoomState.scale = Math.min(Math.max(0.5, initialScale * (dist / initialDist)), 4);
+            updateZoomTransform();
+        } else if (e.touches.length === 1 && state.drawing) {
+            const pos = getPos(e.touches[0]);
+            if(state.tool === 'spray') return;
+            if (state.tool === 'rainbow') {
+                dom.ctx.strokeStyle = `hsl(${(Date.now()/10)%360}, 100%, 50%)`;
+                dom.ctx.beginPath(); dom.ctx.moveTo(state.lastX || pos.x, state.lastY || pos.y);
+            }
+            dom.ctx.lineTo(pos.x, pos.y);
+            dom.ctx.stroke();
+            state.lastX = pos.x; state.lastY = pos.y;
+        }
+    }, {passive: false});
+
+    touchHandler.addEventListener('touchend', e => {
+        if (state.drawing) {
+            state.drawing = false; clearInterval(state.sprayInterval); dom.ctx.closePath(); saveHistory();
+            showUI();
+            state.lastX = null; state.lastY = null;
+        }
+        if (e.touches.length < 2) zoomState.panning = false;
+    });
+
+    // MOUSE FALLBACK
+    dom.canvas.addEventListener('mousedown', e => { hideUI(); state.drawing = true; const pos = getPos(e); dom.ctx.beginPath(); dom.ctx.moveTo(pos.x, pos.y); });
+    window.addEventListener('mousemove', e => {
+        if (!state.drawing) return;
+        const pos = getPos(e);
+        if(state.tool === 'rainbow') { dom.ctx.strokeStyle = `hsl(${(Date.now()/10)%360}, 100%, 50%)`; dom.ctx.beginPath(); dom.ctx.moveTo(state.lastX || pos.x, state.lastY || pos.y); }
+        dom.ctx.lineTo(pos.x, pos.y); dom.ctx.stroke(); state.lastX = pos.x; state.lastY = pos.y;
+    });
+    window.addEventListener('mouseup', () => { if(state.drawing) { state.drawing = false; dom.ctx.closePath(); saveHistory(); showUI(); state.lastX=null;} });
+
+    function getPos(e) {
+        const rect = dom.canvas.getBoundingClientRect();
+        const scaleX = dom.canvas.width / rect.width;
+        const scaleY = dom.canvas.height / rect.height;
+        return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+    }
+
+    // UI
+    function hideUI() { dom.header.classList.add('ui-hidden-top'); dom.footer.classList.add('ui-hidden-bottom'); }
+    function showUI() { dom.header.classList.remove('ui-hidden-top'); dom.footer.classList.remove('ui-hidden-bottom'); }
+    function setTool(toolName) { state.tool = toolName; document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); document.getElementById(`tool-${toolName}`).classList.add('active'); updateCtx(); }
     function setSize(s) { state.size = s; updateCtx(); }
     function setColor(c) { state.color = c; if(state.tool === 'eraser') setTool('pencil'); renderPalette(); updateCtx(); }
-
     function updateCtx() {
-        const ctx = dom.ctx;
-        ctx.lineWidth = state.size;
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
+        const ctx = dom.ctx; ctx.lineWidth = state.size; ctx.shadowBlur = 0; ctx.globalAlpha = 1;
         if (state.tool === 'eraser') ctx.strokeStyle = '#FFFFFF';
         else if (state.tool === 'marker') { ctx.strokeStyle = state.color; ctx.globalAlpha = 0.5; }
         else if (state.tool === 'neon') { ctx.strokeStyle = state.color; ctx.shadowBlur = 10; ctx.shadowColor = state.color; }
         else ctx.strokeStyle = state.color;
     }
-
-    function renderPalette() {
-        document.getElementById('color-palette').innerHTML = COLORS.map(c => `
-            <button onclick="setColor('${c}')" class="flex-shrink-0 w-10 h-10 rounded-full border-2 border-white shadow-sm transition-transform ${state.color === c ? 'scale-110 ring-2 ring-blue-400' : ''}" style="background-color: ${c}"></button>
-        `).join('');
-    }
-
-    let points = [];
-    dom.canvas.addEventListener('pointerdown', e => {
-        state.drawing = true;
-        const pos = getPos(e);
-        dom.ctx.beginPath();
-        dom.ctx.moveTo(pos.x, pos.y);
-        if (state.tool === 'spray') { spray(pos); state.sprayInterval = setInterval(() => spray(getPos(e)), 50); }
-    });
-
-    dom.canvas.addEventListener('pointermove', e => {
-        if (!state.drawing) return;
-        e.preventDefault();
-        const pos = getPos(e);
-        if (state.tool === 'spray') return;
-        dom.ctx.lineTo(pos.x, pos.y);
-        dom.ctx.stroke();
-    });
-
-    const stopDraw = () => { if (state.drawing) { state.drawing = false; clearInterval(state.sprayInterval); dom.ctx.closePath(); saveHistory(); } };
-    dom.canvas.addEventListener('pointerup', stopDraw);
-    dom.canvas.addEventListener('pointerleave', stopDraw);
-
-    function getPos(e) {
-        const r = dom.canvas.getBoundingClientRect();
-        return { x: e.clientX - r.left, y: e.clientY - r.top };
-    }
-
-    function spray(pos) {
-        dom.ctx.fillStyle = state.color;
-        for (let i = 0; i < 10; i++) {
-            const offset = state.size * 2;
-            dom.ctx.fillRect(pos.x + (Math.random()*offset - offset/2), pos.y + (Math.random()*offset - offset/2), 1, 1);
-        }
-    }
-
+    function renderPalette() { document.getElementById('color-palette').innerHTML = COLORS.map(c => `<button onclick="setColor('${c}')" class="flex-shrink-0 w-8 h-8 rounded-full border-2 border-white shadow-sm transition-transform ${state.color === c ? 'scale-110 ring-2 ring-blue-400' : ''}" style="background-color: ${c}"></button>`).join(''); }
+    function spray(pos) { dom.ctx.fillStyle = state.color; for(let i=0;i<10;i++) { const o=state.size*2; dom.ctx.fillRect(pos.x+(Math.random()*o-o/2), pos.y+(Math.random()*o-o/2), 1, 1); } }
+    
+    // GUARDADO
     async function saveCanvas() {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = dom.canvas.width;
-        tempCanvas.height = dom.canvas.height;
-        const tCtx = tempCanvas.getContext('2d');
-        
-        tCtx.drawImage(dom.canvas, 0, 0); // Dibujo
-        
-        // Superponer plantilla
+        const tempCanvas = document.createElement('canvas'); tempCanvas.width = dom.canvas.width; tempCanvas.height = dom.canvas.height; const tCtx = tempCanvas.getContext('2d');
+        tCtx.drawImage(dom.canvas, 0, 0);
         if (state.currentTemplate && state.currentTemplate.id !== 'blank') {
             const overlayImg = dom.overlay.querySelector('img');
             if (overlayImg) {
-                // Dibujar la imagen sobre el canvas final
-                // Asegurarse de que cargue la imagen completa si es un Blob
-                const imgToDraw = new Image();
-                imgToDraw.src = overlayImg.src;
-                await new Promise(r => imgToDraw.onload = r);
-
-                const scale = 0.9;
-                const aspectImg = imgToDraw.naturalWidth / imgToDraw.naturalHeight;
-                const aspectCanvas = tempCanvas.width / tempCanvas.height;
-                let w, h;
-
-                if (aspectImg > aspectCanvas) { w = tempCanvas.width * scale; h = w / aspectImg; } 
-                else { h = tempCanvas.height * scale; w = h * aspectImg; }
-                const x = (tempCanvas.width - w) / 2;
-                const y = (tempCanvas.height - h) / 2;
-                tCtx.drawImage(imgToDraw, x, y, w, h);
+                const i = new Image(); i.src = overlayImg.src; await new Promise(r => i.onload = r);
+                const s = 1; const ai = i.naturalWidth/i.naturalHeight; const ac = tempCanvas.width/tempCanvas.height;
+                let w,h; if(ai>ac){w=tempCanvas.width*s;h=w/ai}else{h=tempCanvas.height*s;w=h*ai}
+                tCtx.drawImage(i, (tempCanvas.width-w)/2, (tempCanvas.height-h)/2, w, h);
             }
         }
-
         const dataUrl = tempCanvas.toDataURL();
-        const newItem = { id: Date.now(), user: state.user, image: dataUrl };
-        await db.saveGalleryItem(newItem);
-        alert('¡Guardado!');
-        state.gallery.unshift(newItem);
-        navigate('home');
+        await db.saveGalleryItem({ id: Date.now(), user: state.user, image: dataUrl });
+        alert('¡Guardado!'); state.gallery.unshift({id: Date.now(), user: state.user, image: dataUrl}); navigate('home');
     }
 
-    // --- GALERÍA ---
-    function renderGallery() {
-        const grid = document.getElementById('gallery-grid');
-        const empty = document.getElementById('empty-gallery');
-        
-        if (state.gallery.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
-        empty.classList.add('hidden');
-        
-        grid.innerHTML = state.gallery.map(item => `
-            <div onclick="toggleSelectVideo(${item.id})" class="relative rounded-xl overflow-hidden shadow-md aspect-square bg-white border-2 transition-all ${state.selectedForVideo.includes(item.id) ? 'border-blue-500 scale-95 ring-4 ring-blue-200' : 'border-slate-200'}">
-                <img src="${item.image}" class="w-full h-full object-cover">
-                <div class="absolute bottom-0 w-full bg-white/90 p-2 flex justify-between items-center backdrop-blur-sm">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase">${item.user}</span>
-                    <button onclick="deleteImg(event, ${item.id})" class="text-red-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                </div>
-                ${state.selectedForVideo.includes(item.id) ? '<div class="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1 shadow"><i data-lucide="check" class="w-4 h-4"></i></div>' : ''}
-            </div>
-        `).join('');
-        lucide.createIcons();
-    }
-
-    function toggleSelectVideo(id) {
-        if(state.selectedForVideo.includes(id)) state.selectedForVideo = state.selectedForVideo.filter(i => i !== id);
-        else state.selectedForVideo.push(id);
-        document.getElementById('selection-count').innerText = `${state.selectedForVideo.length} seleccionados`;
-        document.getElementById('btn-create-video').disabled = state.selectedForVideo.length < 2;
-        renderGallery();
-    }
-
-    async function deleteImg(e, id) {
-        e.stopPropagation();
-        if(confirm('¿Borrar?')) {
-            await db.deleteGalleryItem(id);
-            state.gallery = state.gallery.filter(i => i.id !== id);
-            renderGallery();
-        }
-    }
-
-    function createVideo() {
-        const btn = document.getElementById('btn-create-video');
-        btn.innerHTML = 'Creando...'; btn.disabled = true;
-        const images = state.gallery.filter(i => state.selectedForVideo.includes(i.id)).sort((a,b) => a.id - b.id).map(i => i.image);
-        gifshot.createGIF({ images: images, interval: 0.5, gifWidth: 400, gifHeight: 400 }, obj => {
-            if(!obj.error) {
-                document.getElementById('generated-gif').src = obj.image;
-                document.getElementById('download-gif-link').href = obj.image;
-                document.getElementById('video-modal').classList.remove('hidden');
-                document.getElementById('video-modal').classList.add('flex');
-            }
-            btn.innerHTML = '¡Acción! <i data-lucide="play" class="w-4 h-4 ml-1"></i>'; btn.disabled = false;
-        });
-    }
-
+    // UTILIDADES & CONTROL
     function canvasUndo() { if (state.historyIndex > 0) { state.historyIndex--; restoreImage(state.history[state.historyIndex]); } }
     function canvasRedo() { if (state.historyIndex < state.history.length - 1) { state.historyIndex++; restoreImage(state.history[state.historyIndex]); } }
-    function restoreImage(url) {
-        const img = new Image(); img.src = url;
-        img.onload = () => { dom.ctx.clearRect(0,0,dom.canvas.width,dom.canvas.height); dom.ctx.globalAlpha=1; dom.ctx.shadowBlur=0; dom.ctx.drawImage(img,0,0); updateCtx(); };
-    }
+    function restoreImage(url) { const i = new Image(); i.src = url; i.onload = () => { dom.ctx.clearRect(0,0,dom.canvas.width,dom.canvas.height); dom.ctx.globalAlpha=1; dom.ctx.shadowBlur=0; dom.ctx.drawImage(i,0,0); updateCtx(); }; }
     function saveHistory() { if (state.historyIndex < state.history.length - 1) state.history = state.history.slice(0, state.historyIndex + 1); state.history.push(dom.canvas.toDataURL()); state.historyIndex++; }
+    function renderGallery() { 
+        const g = document.getElementById('gallery-grid'); g.innerHTML = state.gallery.length ? state.gallery.map(i => `<div onclick="toggleSelectVideo(${i.id})" class="relative rounded-xl overflow-hidden shadow-md aspect-square bg-white border-2 transition-all ${state.selectedForVideo.includes(i.id)?'border-blue-500 ring-4':''}"><img src="${i.image}" class="w-full h-full object-cover"><div class="absolute bottom-0 w-full bg-white/90 p-1 flex justify-between"><span class="text-[10px] font-bold uppercase">${i.user}</span><button onclick="deleteImg(event,${i.id})" class="text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join('') : ''; 
+        document.getElementById('empty-gallery').classList.toggle('hidden', state.gallery.length > 0);
+        lucide.createIcons();
+    }
+    function toggleSelectVideo(id) { if(state.selectedForVideo.includes(id)) state.selectedForVideo=state.selectedForVideo.filter(i=>i!==id); else state.selectedForVideo.push(id); document.getElementById('selection-count').innerText=`${state.selectedForVideo.length}`; document.getElementById('btn-create-video').disabled=state.selectedForVideo.length<2; renderGallery(); }
+    async function deleteImg(e,id) { e.stopPropagation(); if(confirm('¿Borrar?')) { await db.deleteGalleryItem(id); state.gallery=state.gallery.filter(i=>i.id!==id); renderGallery(); } }
+    function createVideo() { 
+        const btn=document.getElementById('btn-create-video'); btn.disabled=true; btn.innerHTML='Creando...';
+        const imgs = state.gallery.filter(i=>state.selectedForVideo.includes(i.id)).sort((a,b)=>a.id-b.id).map(i=>i.image);
+        gifshot.createGIF({images:imgs, interval:0.5, gifWidth:400, gifHeight:400}, o => { 
+            if(!o.error) { document.getElementById('generated-gif').src=o.image; document.getElementById('download-gif-link').href=o.image; document.getElementById('video-modal').classList.remove('hidden'); document.getElementById('video-modal').classList.add('flex'); }
+            btn.innerHTML='¡Acción!'; btn.disabled=false;
+        });
+    }
     function closeVideoModal() { document.getElementById('video-modal').classList.add('hidden'); document.getElementById('video-modal').classList.remove('flex'); }
-    function confirmExitCanvas() { if(confirm('¿Salir?')) navigate('home'); }
-
+    
+    // FUNCIÓN DE SALIDA CORREGIDA (Sin confirm)
+    function exitCanvas() {
+        navigate('home');
+    }
+    
     init();
 </script>
 </body>
