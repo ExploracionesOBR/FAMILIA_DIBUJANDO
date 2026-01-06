@@ -62,7 +62,7 @@
             <h1 class="text-5xl md:text-7xl font-bold text-white mb-2 text-center drop-shadow-lg tracking-wide select-none">FAMILIA DIBUJA 🎨</h1>
             <p class="text-white text-lg mb-8 font-medium opacity-90 tracking-widest uppercase text-center">Estudio de Arte Mágico</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl" id="user-grid"></div>
-            <p class="absolute bottom-4 text-white/50 text-xs">v4.1 - Fixes</p>
+            <p class="absolute bottom-4 text-white/50 text-xs">v4.2 - Carga Flexible</p>
         </div>
 
         <!-- HOME -->
@@ -97,7 +97,6 @@
             <!-- HEADER TOOLS -->
             <div id="canvas-header" class="ui-panel absolute top-0 left-0 right-0 z-30 pt-safe px-4 pointer-events-none">
                 <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-2 flex items-center justify-between gap-2 mt-2 pointer-events-auto border border-white/20 mx-auto max-w-4xl">
-                    <!-- BOTÓN X CORREGIDO -->
                     <button onclick="exitCanvas()" class="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200 active:scale-90 transition-transform shadow-sm">
                         <i data-lucide="x" class="w-6 h-6 stroke-[3px]"></i>
                     </button>
@@ -176,9 +175,24 @@
     </div>
 
 <script>
-    // --- CONFIGURACIÓN ---
+    // --- CONFIGURACIÓN DE IMÁGENES ---
+    // ¡AQUÍ ES DONDE REGISTRAS TUS FOTOS!
+    
+    // OPCIÓN A: Si renombras tus fotos a "naturaleza_1.png", "naturaleza_2.png", solo pon el número.
+    // OPCIÓN B: Si quieres usar nombres propios, pon la lista entre corchetes ['foto1.jpg', 'foto2.png'].
+    
     const MIS_IMAGENES = {
-        'naturaleza': 5, 'superheroe': 3, 'princesas': 3, 'animales': 3, 'vehiculos': 3, 'paisajes': 3
+        'naturaleza':['naturaleza_1.png', 'naturaleza_2.png', 'naturaleza_3.png', 'naturaleza_4.png', 'naturaleza_5.png'],
+        
+        'superheroe': 3, // Buscará superheroe_1.png ...
+        
+        // Ejemplo OPCIÓN B (Descomenta y edita si lo necesitas):
+        // 'animales': ['gatito.jpg', 'perro_lindo.png', 'IMG_2023.jpg'],
+        
+        'princesas': 3,
+        'animales': 3,
+        'vehiculos': 3,
+        'paisajes': 3
     };
 
     const CAT_META = {
@@ -207,9 +221,17 @@
 
     function generateTemplates() {
         const templates = [];
-        for (const [cat, count] of Object.entries(MIS_IMAGENES)) {
-            for (let i = 1; i <= count; i++) {
-                templates.push({ id: `${cat}_${i}`, cat: cat, name: `${cat} ${i}`, file: `${cat}_${i}.png`, type: 'png' });
+        for (const [cat, value] of Object.entries(MIS_IMAGENES)) {
+            if (typeof value === 'number') {
+                // Modo Automático: busca categoria_1.png
+                for (let i = 1; i <= value; i++) {
+                    templates.push({ id: `${cat}_${i}`, cat: cat, name: `${cat} ${i}`, file: `${cat}_${i}.png`, type: 'png' });
+                }
+            } else if (Array.isArray(value)) {
+                // Modo Manual: usa la lista de nombres
+                value.forEach((filename, idx) => {
+                    templates.push({ id: `${cat}_manual_${idx}`, cat: cat, name: `${cat} ${idx+1}`, file: filename, type: 'png' });
+                });
             }
         }
         templates.push({ id: 'def_car', cat: 'vehiculos', name: 'Coche Veloz', type: 'svg', content: `<path d="M50 300 H450 V350 H50 Z" /><circle cx="120" cy="350" r="40" /><circle cx="380" cy="350" r="40" /><path d="M100 300 L130 200 H370 L400 300" />` });
@@ -481,7 +503,7 @@
     }
     function closeVideoModal() { document.getElementById('video-modal').classList.add('hidden'); document.getElementById('video-modal').classList.remove('flex'); }
     
-    // FUNCIÓN DE SALIDA CORREGIDA (Sin confirm)
+    // FUNCIÓN DE SALIDA
     function exitCanvas() {
         navigate('home');
     }
