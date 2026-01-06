@@ -24,6 +24,36 @@
       "cat": "princesas",
       "name": "Castillo Real",
       "file": "princesas_1.png"
+    },
+    {
+      "id": "naturaleza_1",
+      "cat": "Naturaleza",
+      "name": "Hermosa Ave",
+      "file": "naturaleza_1.png"
+    },
+    {
+      "id": "naturaleza_2",
+      "cat": "Naturaleza",
+      "name": "Hermosa Mariposa",
+      "file": "naturaleza_2.png"
+    },
+    {
+      "id": "naturaleza_3",
+      "cat": "Naturaleza",
+      "name": "Hermosa Tortuga",
+      "file": "naturaleza_3.png"
+    },
+    {
+      "id": "naturaleza_4",
+      "cat": "Naturaleza",
+      "name": "Ave Bella",
+      "file": "naturaleza_4.png"
+    },
+    {
+      "id": "naturaleza_5",
+      "cat": "Naturaleza",
+      "name": "Hermosa Flor",
+      "file": "naturaleza_5.png"
     }
   ]
 }
