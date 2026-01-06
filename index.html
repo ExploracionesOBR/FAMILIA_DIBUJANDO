@@ -51,6 +51,9 @@
         .ui-hidden-bottom { transform: translateY(120%); opacity: 0; pointer-events: none; }
 
         #zoom-container { touch-action: none; transform-origin: 0 0; will-change: transform; }
+        
+        /* CLASE MÁGICA: Hace que el blanco de las imágenes sea transparente */
+        .blend-multiply { mix-blend-mode: multiply; }
     </style>
 </head>
 <body class="bg-slate-800">
@@ -62,7 +65,7 @@
             <h1 class="text-5xl md:text-7xl font-bold text-white mb-2 text-center drop-shadow-lg tracking-wide select-none">FAMILIA DIBUJA 🎨</h1>
             <p class="text-white text-lg mb-8 font-medium opacity-90 tracking-widest uppercase text-center">Estudio de Arte Mágico</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl" id="user-grid"></div>
-            <p class="absolute bottom-4 text-white/50 text-xs">v4.2 - Carga Flexible</p>
+            <p class="absolute bottom-4 text-white/50 text-xs">v4.3 - Ajuste Perfecto</p>
         </div>
 
         <!-- HOME -->
@@ -123,8 +126,10 @@
 
             <!-- AREA DE DIBUJO -->
             <div id="drawing-area" class="w-full h-full flex items-center justify-center touch-none bg-slate-800">
-                <div id="zoom-container" class="relative shadow-2xl">
-                    <canvas id="drawing-canvas" class="bg-white cursor-crosshair touch-none rounded-sm"></canvas>
+                <div id="zoom-container" class="relative shadow-2xl bg-white">
+                    <!-- Canvas para pintar -->
+                    <canvas id="drawing-canvas" class="cursor-crosshair touch-none"></canvas>
+                    <!-- Capa de imagen (superpuesta) -->
                     <div id="template-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center z-10"></div>
                 </div>
             </div>
@@ -175,20 +180,10 @@
     </div>
 
 <script>
-    // --- CONFIGURACIÓN DE IMÁGENES ---
-    // ¡AQUÍ ES DONDE REGISTRAS TUS FOTOS!
-    
-    // OPCIÓN A: Si renombras tus fotos a "naturaleza_1.png", "naturaleza_2.png", solo pon el número.
-    // OPCIÓN B: Si quieres usar nombres propios, pon la lista entre corchetes ['foto1.jpg', 'foto2.png'].
-    
+    // --- CONFIGURACIÓN ---
     const MIS_IMAGENES = {
         'naturaleza':['naturaleza_1.png', 'naturaleza_2.png', 'naturaleza_3.png', 'naturaleza_4.png', 'naturaleza_5.png'],
-        
-        'superheroe': 3, // Buscará superheroe_1.png ...
-        
-        // Ejemplo OPCIÓN B (Descomenta y edita si lo necesitas):
-        // 'animales': ['gatito.jpg', 'perro_lindo.png', 'IMG_2023.jpg'],
-        
+        'superheroe': 3,
         'princesas': 3,
         'animales': 3,
         'vehiculos': 3,
@@ -223,12 +218,10 @@
         const templates = [];
         for (const [cat, value] of Object.entries(MIS_IMAGENES)) {
             if (typeof value === 'number') {
-                // Modo Automático: busca categoria_1.png
                 for (let i = 1; i <= value; i++) {
                     templates.push({ id: `${cat}_${i}`, cat: cat, name: `${cat} ${i}`, file: `${cat}_${i}.png`, type: 'png' });
                 }
             } else if (Array.isArray(value)) {
-                // Modo Manual: usa la lista de nombres
                 value.forEach((filename, idx) => {
                     templates.push({ id: `${cat}_manual_${idx}`, cat: cat, name: `${cat} ${idx+1}`, file: filename, type: 'png' });
                 });
@@ -346,7 +339,9 @@
         dom.overlay.innerHTML = '';
         if (template.id !== 'blank') {
             const img = new Image();
-            img.className = "w-full h-full object-contain opacity-90 pointer-events-none select-none";
+            // --- AQUI ESTA LA MAGIA DEL BLEND-MODE ---
+            // 'blend-multiply' hace que lo blanco sea transparente
+            img.className = "w-full h-full object-contain pointer-events-none select-none blend-multiply";
             img.src = template.type === 'svg' ? 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500" stroke="black" stroke-width="8" fill="none">${template.content}</svg>`) : template.file;
             dom.overlay.appendChild(img);
         }
@@ -357,8 +352,9 @@
 
     function initCanvasSize() {
         const container = document.getElementById('drawing-area');
-        const width = container.clientWidth - 40; 
-        const height = container.clientHeight - 40;
+        // --- TAMAÑO MÁXIMO (Sin márgenes) ---
+        const width = container.clientWidth; 
+        const height = container.clientHeight;
         
         dom.canvas.width = width;
         dom.canvas.height = height;
@@ -466,14 +462,20 @@
     // GUARDADO
     async function saveCanvas() {
         const tempCanvas = document.createElement('canvas'); tempCanvas.width = dom.canvas.width; tempCanvas.height = dom.canvas.height; const tCtx = tempCanvas.getContext('2d');
+        // 1. Dibujar pintura
         tCtx.drawImage(dom.canvas, 0, 0);
+        // 2. Dibujar plantilla con efecto Multiply
         if (state.currentTemplate && state.currentTemplate.id !== 'blank') {
             const overlayImg = dom.overlay.querySelector('img');
             if (overlayImg) {
                 const i = new Image(); i.src = overlayImg.src; await new Promise(r => i.onload = r);
+                
+                tCtx.globalCompositeOperation = 'multiply'; // MAGIA PARA GUARDAR
+                
                 const s = 1; const ai = i.naturalWidth/i.naturalHeight; const ac = tempCanvas.width/tempCanvas.height;
                 let w,h; if(ai>ac){w=tempCanvas.width*s;h=w/ai}else{h=tempCanvas.height*s;w=h*ai}
                 tCtx.drawImage(i, (tempCanvas.width-w)/2, (tempCanvas.height-h)/2, w, h);
+                tCtx.globalCompositeOperation = 'source-over';
             }
         }
         const dataUrl = tempCanvas.toDataURL();
@@ -481,7 +483,7 @@
         alert('¡Guardado!'); state.gallery.unshift({id: Date.now(), user: state.user, image: dataUrl}); navigate('home');
     }
 
-    // UTILIDADES & CONTROL
+    // UTILIDADES
     function canvasUndo() { if (state.historyIndex > 0) { state.historyIndex--; restoreImage(state.history[state.historyIndex]); } }
     function canvasRedo() { if (state.historyIndex < state.history.length - 1) { state.historyIndex++; restoreImage(state.history[state.historyIndex]); } }
     function restoreImage(url) { const i = new Image(); i.src = url; i.onload = () => { dom.ctx.clearRect(0,0,dom.canvas.width,dom.canvas.height); dom.ctx.globalAlpha=1; dom.ctx.shadowBlur=0; dom.ctx.drawImage(i,0,0); updateCtx(); }; }
@@ -503,7 +505,6 @@
     }
     function closeVideoModal() { document.getElementById('video-modal').classList.add('hidden'); document.getElementById('video-modal').classList.remove('flex'); }
     
-    // FUNCIÓN DE SALIDA
     function exitCanvas() {
         navigate('home');
     }
