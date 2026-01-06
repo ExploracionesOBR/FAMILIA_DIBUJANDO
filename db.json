@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "super_1",
+      "cat": "superheroe",
+      "name": "Batman Volando",
+      "file": "superheroe_1.png"
+    },
+    {
+      "id": "super_2",
+      "cat": "superheroe",
+      "name": "Mujer Maravilla",
+      "file": "superheroe_2.png"
+    },
+    {
+      "id": "ani_1",
+      "cat": "animales",
+      "name": "Perrito",
+      "file": "animales_1.png"
+    },
+    {
+      "id": "princesa_1",
+      "cat": "princesas",
+      "name": "Castillo Real",
+      "file": "princesas_1.png"
+    }
+  ]
+}
