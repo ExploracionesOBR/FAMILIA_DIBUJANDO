@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FAMILIA DIBUJA</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Gifshot para Video -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            overscroll-behavior: none;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #f8fafc;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes bounce-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-bounce-in {
+            animation: bounce-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .status-pulse { animation: pulse-ring 2s infinite; }
+
+        canvas { touch-action: none; }
+
+        .tool-btn.active {
+            background-color: #e0f2fe;
+            border-color: #3b82f6;
+            color: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .category-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .category-card:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden text-slate-800">
+
+    <div id="app" class="h-full w-full relative">
+        
+        <!-- BARRA DE ESTADO (Offline/Online) -->
+        <div id="status-bar" class="absolute top-0 left-0 w-full z-[60] text-[10px] font-bold py-1 px-4 text-center transition-all duration-500 hidden">
+            Iniciando...
+        </div>
+
+        <!-- VISTA: LOGIN -->
+        <div id="login-view" class="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 p-4 absolute inset-0 z-50">
+            <h1 class="text-5xl md:text-7xl font-bold text-white mb-2 text-center drop-shadow-lg tracking-wide">
+                FAMILIA DIBUJA 🎨
+            </h1>
+            <p class="text-white text-lg mb-4 font-medium opacity-90 tracking-widest uppercase">Estudio de Arte Mágico</p>
+            
+            <!-- Indicador de carga inicial de base de datos -->
+            <div id="db-loader" class="mb-8 text-white/80 text-sm flex items-center gap-2">
+                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Verificando dibujos nuevos...
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl hidden" id="user-grid">
+                <!-- JS -->
+            </div>
+            
+            <!-- Configuración URL (Oculta por defecto, tocar título 5 veces para mostrar) -->
+            <div id="config-panel" class="hidden absolute bottom-4 bg-white/90 p-4 rounded-xl shadow-xl w-80">
+                <label class="block text-xs font-bold text-slate-600 mb-1">URL de Base de Datos (GitHub Pages)</label>
+                <input type="text" id="repo-url" class="w-full text-xs p-2 border rounded mb-2" placeholder="https://tu-usuario.github.io/tu-repo/">
+                <button onclick="saveConfig()" class="w-full bg-blue-500 text-white py-2 rounded text-xs font-bold">Guardar y Sincronizar</button>
+            </div>
+        </div>
+
+        <!-- VISTA: HOME (SELECCIÓN) -->
+        <div id="home-view" class="h-full w-full flex-col bg-slate-50 hidden absolute inset-0 z-40 pt-6">
+            <!-- Header -->
+            <div class="bg-white px-4 py-3 shadow-md flex justify-between items-center z-10 sticky top-0">
+                <div class="flex items-center gap-3">
+                    <button onclick="navigate('login')" class="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-600">
+                        <i data-lucide="chevron-left" class="w-7 h-7"></i>
+                    </button>
+                    <div>
+                        <h2 class="text-xl font-bold leading-none text-slate-700">Hola, <span id="user-name-display" class="text-fuchsia-600 font-black"></span></h2>
+                    </div>
+                </div>
+                <button onclick="navigate('gallery')" class="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-4 py-2 rounded-full font-bold shadow-lg active:scale-95 transition-all">
+                    <i data-lucide="image" class="w-5 h-5"></i>
+                    <span class="hidden sm:inline">Galería</span>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-4 pb-24">
+                
+                <!-- Botón Favoritos Grande -->
+                <div id="favorites-section" class="mb-6 hidden">
+                    <div class="flex items-center gap-2 mb-3 px-1">
+                        <i data-lucide="heart" class="text-red-500 w-6 h-6 fill-red-500"></i>
+                        <h3 class="text-lg font-bold text-slate-700">Tus Favoritos</h3>
+                    </div>
+                    <div id="favorites-container" class="flex gap-4 overflow-x-auto pb-4 px-1 no-scrollbar snap-x">
+                        <!-- Favoritos JS -->
+                    </div>
+                </div>
+
+                <!-- Categorías -->
+                <div id="categories-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                    <!-- Categoría: Libre -->
+                    <button onclick="startDrawing({id:'blank'})" class="category-card bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-100 flex items-center gap-4 hover:border-orange-300 hover:shadow-md group">
+                        <div class="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i data-lucide="pencil" class="w-8 h-8 text-orange-500"></i>
+                        </div>
+                        <div class="text-left">
+                            <h3 class="font-bold text-lg text-slate-700">Pizarrón Blanco</h3>
+                            <p class="text-xs text-slate-400">Dibuja lo que quieras</p>
+                        </div>
+                    </button>
+                    <!-- Las demás categorías se generan con JS -->
+                </div>
+
+                <div id="category-detail-view" class="hidden">
+                    <button onclick="showCategories()" class="mb-4 flex items-center gap-2 text-slate-500 font-bold hover:text-slate-700">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i> Volver a Grupos
+                    </button>
+                    <h2 id="category-title" class="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3"></h2>
+                    <div id="templates-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <!-- Templates JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA: CANVAS (DIBUJO) -->
+        <div id="canvas-view" class="h-full w-full flex-col hidden absolute inset-0 z-50 bg-slate-200">
+            <!-- Header Tools -->
+            <div class="bg-white px-2 py-2 shadow-sm flex items-center justify-between gap-2 z-20">
+                <button onclick="confirmExitCanvas()" class="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-100">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+                
+                <!-- Undo/Redo -->
+                <div class="flex gap-1 bg-slate-100 rounded-full p-1">
+                    <button onclick="canvasUndo()" class="p-2 rounded-full hover:bg-slate-200 active:scale-90 text-slate-600"><i data-lucide="undo" class="w-5 h-5"></i></button>
+                    <button onclick="canvasRedo()" class="p-2 rounded-full hover:bg-slate-200 active:scale-90 text-slate-600"><i data-lucide="redo" class="w-5 h-5"></i></button>
+                </div>
+
+                <!-- Herramientas -->
+                <div class="flex gap-1 bg-slate-100 rounded-full p-1 overflow-x-auto no-scrollbar max-w-[50vw]">
+                    <button onclick="setTool('pencil')" id="tool-pencil" class="tool-btn active p-2 rounded-full border border-transparent transition-all"><i data-lucide="pencil" class="w-5 h-5"></i></button>
+                    <button onclick="setTool('marker')" id="tool-marker" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="highlighter" class="w-5 h-5"></i></button>
+                    <button onclick="setTool('spray')" id="tool-spray" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="spray-can" class="w-5 h-5"></i></button>
+                    <button onclick="setTool('neon')" id="tool-neon" class="tool-btn p-2 rounded-full border border-transparent transition-all text-fuchsia-500"><i data-lucide="sparkles" class="w-5 h-5"></i></button>
+                    <button onclick="setTool('rainbow')" id="tool-rainbow" class="tool-btn p-2 rounded-full border border-transparent transition-all text-orange-500"><i data-lucide="rainbow" class="w-5 h-5"></i></button>
+                    <div class="w-px h-8 bg-slate-300 mx-1"></div>
+                    <button onclick="setTool('eraser')" id="tool-eraser" class="tool-btn p-2 rounded-full border border-transparent transition-all"><i data-lucide="eraser" class="w-5 h-5"></i></button>
+                </div>
+
+                <button onclick="saveCanvas()" class="bg-green-500 text-white p-2 px-4 rounded-full font-bold shadow active:scale-95 flex items-center gap-2">
+                    <i data-lucide="save" class="w-5 h-5"></i> <span class="hidden sm:inline">Guardar</span>
+                </button>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="relative flex-1 bg-gray-300 overflow-hidden flex items-center justify-center shadow-inner touch-none">
+                <canvas id="drawing-canvas" class="bg-white shadow-2xl cursor-crosshair touch-none absolute inset-0"></canvas>
+                <!-- Capa superior para imágenes PNG (contornos) -->
+                <div id="template-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+            </div>
+
+            <!-- Footer Tools -->
+            <div class="bg-white p-3 pb-6 shadow-up z-20 flex flex-col gap-3 rounded-t-2xl">
+                <!-- Sizes -->
+                <div class="flex justify-center gap-6 items-center mb-1">
+                    <button onclick="setSize(5)" class="w-3 h-3 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
+                    <button onclick="setSize(12)" class="w-5 h-5 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
+                    <button onclick="setSize(25)" class="w-8 h-8 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
+                    <button onclick="setSize(45)" class="w-12 h-12 rounded-full bg-slate-800 ring-offset-2 hover:ring-2"></button>
+                </div>
+                
+                <!-- Colors -->
+                <div class="flex gap-3 overflow-x-auto pb-2 no-scrollbar px-2" id="color-palette"></div>
+            </div>
+        </div>
+
+        <!-- VISTA: GALERÍA -->
+        <div id="gallery-view" class="h-full w-full flex-col hidden absolute inset-0 z-40 bg-slate-50 pt-6">
+            <div class="bg-white p-4 shadow-md flex justify-between items-center sticky top-0 z-30">
+                <button onclick="navigate('home')" class="p-2 bg-slate-100 rounded-full text-slate-700"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+                <h2 class="text-xl font-bold text-slate-800">Galería de Arte</h2>
+                <div class="w-10"></div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-2xl mb-6 shadow-lg text-white">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="clapperboard" class="w-5 h-5"></i> Crear Película</h3>
+                        <span id="selection-count" class="text-xs bg-white/20 px-2 py-1 rounded-full">0 seleccionados</span>
+                    </div>
+                    <p class="text-white/80 text-sm mb-3">Selecciona varios dibujos para unirlos en un video mágico.</p>
+                    <button id="btn-create-video" onclick="createVideo()" disabled class="w-full bg-white text-blue-600 py-2 rounded-lg font-bold shadow-sm disabled:opacity-50 flex justify-center items-center gap-2">
+                        ¡Acción! <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                    </button>
+                </div>
+
+                <div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-20"></div>
+                <div id="empty-gallery" class="hidden text-center text-slate-400 mt-20"><i data-lucide="image" class="w-16 h-16 mx-auto mb-4 opacity-50"></i><p>Tu galería está vacía.</p></div>
+            </div>
+        </div>
+        
+        <!-- MODAL: VIDEO -->
+        <div id="video-modal" class="fixed inset-0 z-[60] bg-black/95 hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
+            <h3 class="text-white text-3xl font-bold mb-6 animate-bounce text-center">¡Tu Obra Maestra! 🎬</h3>
+            <img id="generated-gif" src="" class="max-w-full max-h-[50vh] border-8 border-white rounded-xl shadow-2xl mb-8 bg-white rotate-1">
+            <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+                 <a id="download-gif-link" href="#" download="mi-pelicula.gif" class="flex-1 bg-green-500 text-white py-4 rounded-2xl font-bold text-lg hover:bg-green-600 text-center flex items-center justify-center gap-2 shadow-lg hover:-translate-y-1 transition-transform">
+                    <i data-lucide="download" class="w-6 h-6"></i> Guardar Video
+                </a>
+                <button onclick="closeVideoModal()" class="flex-1 bg-slate-700 text-white py-4 rounded-2xl font-bold text-lg hover:bg-slate-600 text-center shadow-lg">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- CONFIGURACIÓN ---
+    const DEFAULT_REPO_URL = 'https://tu-usuario.github.io/familia-dibuja-db/'; // Cambia esto
+    const DB_NAME = 'FamiliaDibujaDB';
+    const DB_VERSION = 1;
+    const USERS = ['ALEXANDER', 'DANIEL', 'ROBERTO', 'BOMBON', 'YERIS'];
+    const COLORS = ['#000000', '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#FF00FF', '#FFFFFF', '#8B4513', '#00FFFF', '#FF1493', '#32CD32', '#F08080', '#20B2AA'];
+    
+    // Categorías Base (Iconos y colores)
+    const CAT_META = {
+        'superheroe': { name: 'Superhéroes', icon: 'shield', color: 'bg-blue-100 text-blue-600' },
+        'princesas': { name: 'Princesas', icon: 'crown', color: 'bg-pink-100 text-pink-500' },
+        'animales': { name: 'Animales', icon: 'cat', color: 'bg-yellow-100 text-yellow-600' },
+        'vehiculos': { name: 'Vehículos', icon: 'car', color: 'bg-green-100 text-green-600' },
+        'paisajes': { name: 'Paisajes', icon: 'mountain-snow', color: 'bg-teal-100 text-teal-600' },
+        'naturaleza': { name: 'Naturaleza', icon: 'flower', color: 'bg-lime-100 text-lime-600' },
+        'otros': { name: 'Varios', icon: 'star', color: 'bg-slate-100 text-slate-600' }
+    };
+
+    // Plantillas por defecto (SVGs integrados para empezar)
+    const DEFAULT_TEMPLATES = [
+        { id: 'def_car', cat: 'vehiculos', name: 'Coche', type: 'svg', content: `<path d="M50 300 H450 V350 H50 Z" /><circle cx="120" cy="350" r="40" /><circle cx="380" cy="350" r="40" /><path d="M100 300 L130 200 H370 L400 300" />` },
+        { id: 'def_house', cat: 'paisajes', name: 'Casa', type: 'svg', content: `<rect x="100" y="200" width="300" height="200" fill="none" /><path d="M50 200 L250 50 L450 200" /><rect x="220" y="300" width="60" height="100" />` }
+    ];
+
+    // --- ESTADO GLOBAL ---
+    let state = {
+        user: null,
+        repoUrl: localStorage.getItem('repo_url') || '',
+        templates: [], // Se mezcla DB local + Default
+        gallery: [],
+        favorites: JSON.parse(localStorage.getItem('favs') || '[]'),
+        tool: 'pencil',
+        color: '#000000',
+        size: 5,
+        history: [],
+        historyIndex: -1,
+        selectedForVideo: [],
+        drawing: false,
+        currentTemplate: null // Objeto template actual
+    };
+
+    // --- BASE DE DATOS LOCAL (IndexedDB) ---
+    const db = {
+        open: () => new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const d = e.target.result;
+                if (!d.objectStoreNames.contains('images')) d.createObjectStore('images', { keyPath: 'id' });
+                if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'key' });
+                if (!d.objectStoreNames.contains('gallery')) d.createObjectStore('gallery', { keyPath: 'id' });
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        }),
+        putImage: async (id, blob) => {
+            const d = await db.open();
+            return new Promise((resolve, reject) => {
+                const tx = d.transaction('images', 'readwrite');
+                tx.objectStore('images').put({ id, blob });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject();
+            });
+        },
+        getImage: async (id) => {
+            const d = await db.open();
+            return new Promise((resolve) => {
+                const req = d.transaction('images', 'readonly').objectStore('images').get(id);
+                req.onsuccess = () => resolve(req.result ? req.result.blob : null);
+                req.onerror = () => resolve(null);
+            });
+        },
+        getAllGallery: async () => {
+             const d = await db.open();
+             return new Promise(resolve => {
+                 const req = d.transaction('gallery', 'readonly').objectStore('gallery').getAll();
+                 req.onsuccess = () => resolve(req.result || []);
+             });
+        },
+        saveGalleryItem: async (item) => {
+            const d = await db.open();
+            return new Promise(resolve => {
+                const tx = d.transaction('gallery', 'readwrite');
+                tx.objectStore('gallery').put(item);
+                tx.oncomplete = () => resolve();
+            });
+        },
+        deleteGalleryItem: async (id) => {
+            const d = await db.open();
+            const tx = d.transaction('gallery', 'readwrite');
+            tx.objectStore('gallery').delete(id);
+        }
+    };
+
+    // --- SISTEMA DE SINCRONIZACIÓN ---
+    async function syncDatabase() {
+        showStatus('Buscando dibujos nuevos...', 'bg-blue-500');
+        const url = state.repoUrl || DEFAULT_REPO_URL;
+        
+        // 1. Intentar descargar db.json
+        try {
+            const response = await fetch(`${url}db.json?t=${Date.now()}`); // Anti-cache
+            if (!response.ok) throw new Error('No accesible');
+            const data = await response.json();
+            
+            // 2. Procesar lista
+            let newCount = 0;
+            for (const item of data.templates) {
+                // Verificar si ya tenemos la imagen
+                const existing = await db.getImage(item.id);
+                if (!existing) {
+                    showStatus(`Descargando: ${item.name}`, 'bg-green-500');
+                    const imgResp = await fetch(`${url}${item.file}`);
+                    const blob = await imgResp.blob();
+                    await db.putImage(item.id, blob);
+                    newCount++;
+                }
+            }
+            
+            // Guardar meta lista en localStorage para acceso rápido
+            localStorage.setItem('templates_meta', JSON.stringify(data.templates));
+            showStatus(newCount > 0 ? `¡${newCount} nuevos dibujos!` : 'Todo actualizado', 'bg-green-600');
+            setTimeout(hideStatus, 3000);
+            return data.templates;
+
+        } catch (e) {
+            console.log('Modo Offline o Error:', e);
+            showStatus('Modo Offline: Usando dibujos guardados', 'bg-slate-500');
+            setTimeout(hideStatus, 4000);
+            return JSON.parse(localStorage.getItem('templates_meta') || '[]');
+        }
+    }
+
+    // --- UI HELPERS ---
+    function showStatus(msg, colorClass) {
+        const bar = document.getElementById('status-bar');
+        bar.textContent = msg;
+        bar.className = `absolute top-0 left-0 w-full z-[60] text-[10px] font-bold py-1 px-4 text-center text-white transition-all duration-500 flex items-center justify-center gap-2 ${colorClass}`;
+        bar.classList.remove('hidden');
+    }
+    function hideStatus() {
+        document.getElementById('status-bar').classList.add('hidden');
+    }
+
+    // --- INICIALIZACIÓN ---
+    async function init() {
+        lucide.createIcons();
+        renderLogin();
+
+        // Cargar galería local
+        state.gallery = await db.getAllGallery();
+        state.gallery.sort((a,b) => b.id - a.id);
+
+        // Sincronizar
+        const externalTemplates = await syncDatabase();
+        
+        // Unir plantillas (Externas + Defecto)
+        state.templates = [...externalTemplates, ...DEFAULT_TEMPLATES];
+        
+        // Ocultar loader
+        document.getElementById('db-loader').classList.add('hidden');
+        document.getElementById('user-grid').classList.remove('hidden');
+        document.getElementById('user-grid').classList.add('grid');
+    }
+
+    // --- NAVEGACIÓN ---
+    const dom = {
+        views: { login: 'login-view', home: 'home-view', canvas: 'canvas-view', gallery: 'gallery-view' },
+        canvas: document.getElementById('drawing-canvas'),
+        ctx: document.getElementById('drawing-canvas').getContext('2d'),
+        overlay: document.getElementById('template-overlay')
+    };
+
+    function navigate(viewId) {
+        Object.values(dom.views).forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        });
+        document.getElementById(dom.views[viewId]).classList.remove('hidden');
+        document.getElementById(dom.views[viewId]).classList.add('flex');
+        
+        if (viewId === 'gallery') {
+            state.selectedForVideo = [];
+            renderGallery();
+        }
+        if (viewId === 'home') {
+            renderHomeCategories();
+            updateFavoritesUI();
+        }
+    }
+
+    // --- LOGIN ---
+    function renderLogin() {
+        const grid = document.getElementById('user-grid');
+        const colors = ['bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500'];
+        grid.innerHTML = USERS.map((u, i) => `
+            <button onclick="login('${u}')" class="${colors[i%colors.length]} p-6 rounded-3xl shadow-xl border-4 border-white/30 transform transition hover:scale-105 active:scale-95 animate-bounce-in" style="animation-delay: ${i*100}ms">
+                <div class="bg-white/20 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                    <i data-lucide="smile" class="w-12 h-12 text-white"></i>
+                </div>
+                <span class="text-2xl font-black text-white tracking-wider block text-center">${u}</span>
+            </button>
+        `).join('');
+        
+        // Easter egg para config
+        document.querySelector('h1').onclick = (e) => {
+            if(e.detail === 5) document.getElementById('config-panel').classList.remove('hidden');
+        };
+    }
+
+    function saveConfig() {
+        const url = document.getElementById('repo-url').value;
+        if(url) {
+            state.repoUrl = url.endsWith('/') ? url : url + '/';
+            localStorage.setItem('repo_url', state.repoUrl);
+            location.reload(); // Recargar para sincronizar
+        }
+    }
+
+    function login(name) {
+        state.user = name;
+        document.getElementById('user-name-display').innerText = name;
+        navigate('home');
+    }
+
+    // --- CATEGORÍAS Y PLANTILLAS ---
+    function renderHomeCategories() {
+        const container = document.getElementById('categories-list');
+        const staticHtml = container.innerHTML.split('<!-- Las demás')[0];
+        
+        // Agrupar plantillas disponibles por categoría
+        const availableCats = new Set(state.templates.map(t => t.cat));
+        
+        const dynamicHtml = Array.from(availableCats).map(catKey => {
+            const meta = CAT_META[catKey] || CAT_META['otros'];
+            return `
+            <button onclick="openCategory('${catKey}')" class="category-card bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-100 flex items-center gap-4 hover:border-blue-300 hover:shadow-md group">
+                <div class="w-16 h-16 rounded-2xl ${meta.color} flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <i data-lucide="${meta.icon}" class="w-8 h-8"></i>
+                </div>
+                <div class="text-left">
+                    <h3 class="font-bold text-lg text-slate-700 capitalize">${meta.name}</h3>
+                    <p class="text-xs text-slate-400">Ver dibujos</p>
+                </div>
+            </button>
+            `;
+        }).join('');
+
+        container.innerHTML = staticHtml + dynamicHtml;
+        lucide.createIcons();
+    }
+
+    function openCategory(catKey) {
+        document.getElementById('categories-list').classList.add('hidden');
+        document.getElementById('category-detail-view').classList.remove('hidden');
+        
+        const meta = CAT_META[catKey] || CAT_META['otros'];
+        document.getElementById('category-title').innerHTML = `
+            <div class="p-2 rounded-xl ${meta.color}"><i data-lucide="${meta.icon}"></i></div> ${meta.name}
+        `;
+
+        const templates = state.templates.filter(t => t.cat === catKey);
+        renderTemplateGrid(templates);
+    }
+
+    function showCategories() {
+        document.getElementById('categories-list').classList.remove('hidden');
+        document.getElementById('category-detail-view').classList.add('hidden');
+        document.getElementById('favorites-section').classList.remove('hidden');
+        updateFavoritesUI();
+    }
+
+    // Renderizado Asíncrono de la Rejilla (para cargar imágenes de IndexedDB)
+    async function renderTemplateGrid(templates) {
+        const grid = document.getElementById('templates-grid');
+        grid.innerHTML = '<div class="col-span-full text-center text-slate-400">Cargando imágenes...</div>';
+        
+        const itemsHtml = await Promise.all(templates.map(async (t) => {
+            let src = '';
+            let style = '';
+            
+            if (t.type === 'svg') {
+                src = `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" stroke="black" stroke-width="8" fill="none">${t.content}</svg>`)}`;
+                style = 'p-4';
+            } else {
+                // Recuperar Blob de IndexedDB
+                const blob = await db.getImage(t.id);
+                if (blob) {
+                    src = URL.createObjectURL(blob);
+                    style = 'object-contain p-1';
+                } else {
+                    src = ''; // Fallback placeholder
+                }
+            }
+
+            const isFav = state.favorites.includes(t.id);
+            return `
+            <div class="relative group animate-bounce-in">
+                <button onclick='startDrawing(${JSON.stringify(t)})' class="w-full bg-white p-2 rounded-3xl shadow border-2 border-slate-100 hover:border-blue-400 hover:shadow-lg transition-all flex flex-col items-center gap-2">
+                    <div class="w-full aspect-square bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center">
+                        ${src ? `<img src="${src}" class="w-full h-full ${style}">` : '<span class="text-xs text-red-400">Error img</span>'}
+                    </div>
+                    <span class="font-bold text-slate-600 text-sm truncate w-full text-center">${t.name}</span>
+                </button>
+                <button onclick="toggleFavorite('${t.id}')" class="absolute top-2 right-2 p-2 rounded-full ${isFav ? 'bg-red-100 text-red-500' : 'bg-slate-100 text-slate-300'} hover:scale-110 transition-transform shadow-sm">
+                    <i data-lucide="heart" class="w-5 h-5 ${isFav ? 'fill-current' : ''}"></i>
+                </button>
+            </div>
+            `;
+        }));
+
+        grid.innerHTML = itemsHtml.join('');
+        lucide.createIcons();
+    }
+
+    // --- FAVORITES ---
+    function toggleFavorite(id) {
+        if (state.favorites.includes(id)) {
+            state.favorites = state.favorites.filter(fid => fid !== id);
+        } else {
+            state.favorites.push(id);
+        }
+        localStorage.setItem('favs', JSON.stringify(state.favorites));
+        
+        // Refrescar si estamos viendo categorías
+        if (!document.getElementById('category-detail-view').classList.contains('hidden')) {
+             // Hack simple para no recomponer todo el DOM pesado
+             const btn = event.currentTarget;
+             const icon = btn.querySelector('svg');
+             if(state.favorites.includes(id)) {
+                 btn.className = "absolute top-2 right-2 p-2 rounded-full bg-red-100 text-red-500 hover:scale-110 transition-transform shadow-sm";
+                 icon.setAttribute('fill', 'currentColor');
+             } else {
+                 btn.className = "absolute top-2 right-2 p-2 rounded-full bg-slate-100 text-slate-300 hover:scale-110 transition-transform shadow-sm";
+                 icon.setAttribute('fill', 'none');
+             }
+        }
+        updateFavoritesUI();
+    }
+
+    async function updateFavoritesUI() {
+        const container = document.getElementById('favorites-container');
+        const section = document.getElementById('favorites-section');
+        
+        if (state.favorites.length === 0) {
+            section.classList.add('hidden');
+            return;
+        }
+        section.classList.remove('hidden');
+
+        // Filtrar plantillas favoritas
+        const favTemplates = state.templates.filter(t => state.favorites.includes(t.id));
+
+        const html = await Promise.all(favTemplates.map(async t => {
+            let src = '';
+            if (t.type === 'svg') {
+                src = `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" stroke="black" stroke-width="20" fill="none">${t.content}</svg>`)}`;
+            } else {
+                const blob = await db.getImage(t.id);
+                src = blob ? URL.createObjectURL(blob) : '';
+            }
+            return `
+            <button onclick='startDrawing(${JSON.stringify(t)})' class="flex-shrink-0 w-24 h-24 bg-white rounded-2xl border-2 border-red-100 p-2 flex flex-col items-center justify-center gap-1 shadow-sm snap-start">
+                 <img src="${src}" class="w-10 h-10 object-contain">
+                 <span class="text-[10px] font-bold text-slate-500 truncate w-full text-center">${t.name}</span>
+            </button>
+            `;
+        }));
+
+        container.innerHTML = html.join('');
+    }
+
+    // --- CANVAS ---
+    async function startDrawing(template) {
+        state.currentTemplate = template;
+        state.history = [];
+        state.historyIndex = -1;
+        setTool('pencil');
+        
+        navigate('canvas');
+        resizeCanvas();
+        
+        // Configurar Overlay (La imagen va ENCIMA para que se pueda pintar debajo de las líneas negras)
+        dom.overlay.innerHTML = '';
+        
+        if (template.id !== 'blank') {
+            if (template.type === 'svg') {
+                dom.overlay.innerHTML = `<svg viewBox="0 0 500 500" class="w-[90%] h-[90%]" stroke="black" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round">${template.content}</svg>`;
+            } else {
+                const blob = await db.getImage(template.id);
+                if (blob) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(blob);
+                    img.className = "w-full h-full object-contain opacity-90"; 
+                    dom.overlay.appendChild(img);
+                }
+            }
+        }
+        
+        renderPalette();
+        saveHistory(); 
+    }
+
+    function resizeCanvas() {
+        const parent = dom.canvas.parentElement;
+        dom.canvas.width = parent.clientWidth;
+        dom.canvas.height = parent.clientHeight;
+        dom.ctx.lineCap = 'round';
+        dom.ctx.lineJoin = 'round';
+        dom.ctx.fillStyle = 'white';
+        dom.ctx.fillRect(0,0, dom.canvas.width, dom.canvas.height);
+        updateCtx();
+    }
+
+    function setTool(toolName) {
+        state.tool = toolName;
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`tool-${toolName}`).classList.add('active');
+        updateCtx();
+    }
+
+    function setSize(s) { state.size = s; updateCtx(); }
+    function setColor(c) { state.color = c; if(state.tool === 'eraser') setTool('pencil'); renderPalette(); updateCtx(); }
+
+    function updateCtx() {
+        const ctx = dom.ctx;
+        ctx.lineWidth = state.size;
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        
+        if (state.tool === 'eraser') ctx.strokeStyle = '#FFFFFF';
+        else if (state.tool === 'marker') { ctx.strokeStyle = state.color; ctx.globalAlpha = 0.5; }
+        else if (state.tool === 'neon') { ctx.strokeStyle = state.color; ctx.shadowBlur = 10; ctx.shadowColor = state.color; }
+        else ctx.strokeStyle = state.color;
+    }
+
+    function renderPalette() {
+        document.getElementById('color-palette').innerHTML = COLORS.map(c => `
+            <button onclick="setColor('${c}')" class="flex-shrink-0 w-10 h-10 rounded-full border-2 border-white shadow-sm transition-transform ${state.color === c ? 'scale-110 ring-2 ring-blue-400' : ''}" style="background-color: ${c}"></button>
+        `).join('');
+    }
+
+    // --- DIBUJO ---
+    let points = [];
+    dom.canvas.addEventListener('pointerdown', e => {
+        state.drawing = true;
+        const pos = getPos(e);
+        dom.ctx.beginPath();
+        dom.ctx.moveTo(pos.x, pos.y);
+        if (state.tool === 'spray') { spray(pos); state.sprayInterval = setInterval(() => spray(getPos(e)), 50); }
+    });
+
+    dom.canvas.addEventListener('pointermove', e => {
+        if (!state.drawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        if (state.tool === 'spray') return;
+        if (state.tool === 'rainbow') {
+            dom.ctx.strokeStyle = `hsl(${(Date.now()/10)%360}, 100%, 50%)`;
+            dom.ctx.beginPath(); dom.ctx.moveTo(points[points.length-1]?.x || pos.x, points[points.length-1]?.y || pos.y);
+        }
+        dom.ctx.lineTo(pos.x, pos.y);
+        dom.ctx.stroke();
+        points.push(pos);
+    });
+
+    const stopDraw = () => { if (state.drawing) { state.drawing = false; clearInterval(state.sprayInterval); dom.ctx.closePath(); saveHistory(); points=[]; } };
+    dom.canvas.addEventListener('pointerup', stopDraw);
+    dom.canvas.addEventListener('pointerleave', stopDraw);
+
+    function getPos(e) {
+        const r = dom.canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    function spray(pos) {
+        dom.ctx.fillStyle = state.color;
+        for (let i = 0; i < 10; i++) {
+            const offset = state.size * 2;
+            dom.ctx.fillRect(pos.x + (Math.random()*offset - offset/2), pos.y + (Math.random()*offset - offset/2), 1, 1);
+        }
+    }
+
+    // --- GUARDADO ---
+    async function saveCanvas() {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = dom.canvas.width;
+        tempCanvas.height = dom.canvas.height;
+        const tCtx = tempCanvas.getContext('2d');
+        
+        // 1. Dibujo del niño
+        tCtx.drawImage(dom.canvas, 0, 0);
+        
+        // 2. Superponer plantilla (SVG o PNG)
+        if (state.currentTemplate && state.currentTemplate.id !== 'blank') {
+            const t = state.currentTemplate;
+            const img = new Image();
+            
+            // Promesa para cargar la imagen de overlay
+            await new Promise(resolve => {
+                img.onload = () => {
+                    // Centrar y ajustar ("contain")
+                    const scale = 0.9;
+                    const aspectImg = img.width / img.height;
+                    const aspectCanvas = tempCanvas.width / tempCanvas.height;
+                    let w, h;
+
+                    if (aspectImg > aspectCanvas) {
+                        w = tempCanvas.width * scale;
+                        h = w / aspectImg;
+                    } else {
+                        h = tempCanvas.height * scale;
+                        w = h * aspectImg;
+                    }
+                    const x = (tempCanvas.width - w) / 2;
+                    const y = (tempCanvas.height - h) / 2;
+                    
+                    tCtx.drawImage(img, x, y, w, h);
+                    resolve();
+                };
+                
+                if (t.type === 'svg') {
+                     img.src = 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="${tempCanvas.width}" height="${tempCanvas.height}" stroke="black" stroke-width="8" fill="none">${t.content}</svg>`);
+                } else {
+                    // Cargar de DB
+                    db.getImage(t.id).then(blob => {
+                        if(blob) img.src = URL.createObjectURL(blob);
+                        else resolve(); // Fallback si falla
+                    });
+                }
+            });
+        }
+
+        const dataUrl = tempCanvas.toDataURL();
+        const newItem = { id: Date.now(), user: state.user, image: dataUrl };
+        await db.saveGalleryItem(newItem); // Guardar en IndexedDB
+        
+        alert('¡Obra de arte guardada!');
+        state.gallery.unshift(newItem);
+        navigate('home');
+    }
+
+    // --- GALERÍA & VIDEO ---
+    function renderGallery() {
+        const grid = document.getElementById('gallery-grid');
+        const empty = document.getElementById('empty-gallery');
+        
+        if (state.gallery.length === 0) {
+            grid.innerHTML = ''; empty.classList.remove('hidden'); return;
+        }
+        empty.classList.add('hidden');
+        
+        grid.innerHTML = state.gallery.map(item => `
+            <div onclick="toggleSelectVideo(${item.id})" class="relative rounded-xl overflow-hidden shadow-md aspect-square bg-white border-2 transition-all ${state.selectedForVideo.includes(item.id) ? 'border-blue-500 scale-95 ring-4 ring-blue-200' : 'border-slate-200'}">
+                <img src="${item.image}" class="w-full h-full object-cover">
+                <div class="absolute bottom-0 w-full bg-white/90 p-2 flex justify-between items-center backdrop-blur-sm">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase">${item.user}</span>
+                    <button onclick="deleteImg(event, ${item.id})" class="text-red-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>
+                ${state.selectedForVideo.includes(item.id) ? '<div class="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1 shadow"><i data-lucide="check" class="w-4 h-4"></i></div>' : ''}
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function toggleSelectVideo(id) {
+        if(state.selectedForVideo.includes(id)) state.selectedForVideo = state.selectedForVideo.filter(i => i !== id);
+        else state.selectedForVideo.push(id);
+        document.getElementById('selection-count').innerText = `${state.selectedForVideo.length} seleccionados`;
+        document.getElementById('btn-create-video').disabled = state.selectedForVideo.length < 2;
+        renderGallery();
+    }
+
+    async function deleteImg(e, id) {
+        e.stopPropagation();
+        if(confirm('¿Borrar?')) {
+            await db.deleteGalleryItem(id);
+            state.gallery = state.gallery.filter(i => i.id !== id);
+            renderGallery();
+        }
+    }
+
+    function createVideo() {
+        const btn = document.getElementById('btn-create-video');
+        btn.innerHTML = 'Creando Magia...'; btn.disabled = true;
+        const images = state.gallery.filter(i => state.selectedForVideo.includes(i.id)).sort((a,b) => a.id - b.id).map(i => i.image);
+        gifshot.createGIF({ images: images, interval: 0.5, gifWidth: 400, gifHeight: 400 }, obj => {
+            if(!obj.error) {
+                document.getElementById('generated-gif').src = obj.image;
+                document.getElementById('download-gif-link').href = obj.image;
+                document.getElementById('video-modal').classList.remove('hidden');
+                document.getElementById('video-modal').classList.add('flex');
+            }
+            btn.innerHTML = '¡Acción! <i data-lucide="play" class="w-4 h-4 ml-1"></i>'; btn.disabled = false;
+        });
+    }
+    
+    // --- UTILS HISTORY ---
+    function saveHistory() {
+        if (state.historyIndex < state.history.length - 1) state.history = state.history.slice(0, state.historyIndex + 1);
+        state.history.push(dom.canvas.toDataURL()); state.historyIndex++;
+    }
+    function canvasUndo() { if (state.historyIndex > 0) { state.historyIndex--; restoreImage(state.history[state.historyIndex]); } }
+    function canvasRedo() { if (state.historyIndex < state.history.length - 1) { state.historyIndex++; restoreImage(state.history[state.historyIndex]); } }
+    function restoreImage(url) {
+        const img = new Image(); img.src = url;
+        img.onload = () => { dom.ctx.clearRect(0,0,dom.canvas.width,dom.canvas.height); dom.ctx.globalAlpha=1; dom.ctx.shadowBlur=0; dom.ctx.drawImage(img,0,0); updateCtx(); };
+    }
+    function closeVideoModal() { document.getElementById('video-modal').classList.add('hidden'); document.getElementById('video-modal').classList.remove('flex'); }
+    function confirmExitCanvas() { if(confirm('¿Salir sin guardar?')) navigate('home'); }
+
+    // ARRANCAR
+    init();
+</script>
+</body>
+</html>
