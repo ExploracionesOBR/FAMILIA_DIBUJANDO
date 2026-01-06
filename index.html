@@ -52,8 +52,8 @@
 
         #zoom-container { touch-action: none; transform-origin: 0 0; will-change: transform; }
         
-        /* CLASE MÁGICA: Hace que el blanco de las imágenes sea transparente */
-        .blend-multiply { mix-blend-mode: multiply; }
+        /* Loading Overlay for Processing */
+        #processing-overlay { background: rgba(255,255,255,0.9); z-index: 60; }
     </style>
 </head>
 <body class="bg-slate-800">
@@ -65,7 +65,7 @@
             <h1 class="text-5xl md:text-7xl font-bold text-white mb-2 text-center drop-shadow-lg tracking-wide select-none">FAMILIA DIBUJA 🎨</h1>
             <p class="text-white text-lg mb-8 font-medium opacity-90 tracking-widest uppercase text-center">Estudio de Arte Mágico</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl" id="user-grid"></div>
-            <p class="absolute bottom-4 text-white/50 text-xs">v4.3 - Ajuste Perfecto</p>
+            <p class="absolute bottom-4 text-white/50 text-xs">v4.5 - Auto Transparencia</p>
         </div>
 
         <!-- HOME -->
@@ -97,6 +97,12 @@
         <!-- CANVAS (DIBUJO) -->
         <div id="canvas-view" class="h-full w-full hidden absolute inset-0 z-50 bg-slate-800 overflow-hidden">
             
+            <!-- Procesando Imagen -->
+            <div id="processing-overlay" class="absolute inset-0 hidden flex-col items-center justify-center pointer-events-none">
+                <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
+                <p class="text-blue-600 font-bold text-xl animate-pulse">Preparando dibujo...</p>
+            </div>
+
             <!-- HEADER TOOLS -->
             <div id="canvas-header" class="ui-panel absolute top-0 left-0 right-0 z-30 pt-safe px-4 pointer-events-none">
                 <div class="bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl p-2 flex items-center justify-between gap-2 mt-2 pointer-events-auto border border-white/20 mx-auto max-w-4xl">
@@ -127,9 +133,9 @@
             <!-- AREA DE DIBUJO -->
             <div id="drawing-area" class="w-full h-full flex items-center justify-center touch-none bg-slate-800">
                 <div id="zoom-container" class="relative shadow-2xl bg-white">
-                    <!-- Canvas para pintar -->
+                    <!-- Canvas para pintar (ABAJO) -->
                     <canvas id="drawing-canvas" class="cursor-crosshair touch-none"></canvas>
-                    <!-- Capa de imagen (superpuesta) -->
+                    <!-- Capa de imagen PROCESADA (SUPERPUESTA - ARRIBA) -->
                     <div id="template-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center z-10"></div>
                 </div>
             </div>
@@ -277,7 +283,8 @@
         overlay: document.getElementById('template-overlay'),
         zoomContainer: document.getElementById('zoom-container'),
         header: document.getElementById('canvas-header'),
-        footer: document.getElementById('canvas-footer')
+        footer: document.getElementById('canvas-footer'),
+        processing: document.getElementById('processing-overlay')
     };
 
     function navigate(viewId) {
@@ -330,23 +337,74 @@
     }
     function showCategories() { document.getElementById('categories-list').classList.remove('hidden'); document.getElementById('category-detail-view').classList.add('hidden'); }
 
+    // --- FUNCIÓN DE LIMPIEZA MÁGICA (Hace transparente el blanco) ---
+    function processImage(imgSource, callback) {
+        const tempCanvas = document.createElement('canvas');
+        const ctx = tempCanvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+            tempCanvas.width = img.width;
+            tempCanvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            // Magia: Obtener píxeles y borrar los blancos
+            const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                // R, G, B, Alpha
+                if (data[i] > 200 && data[i+1] > 200 && data[i+2] > 200) { // Si es casi blanco
+                    data[i+3] = 0; // Hacerlo 100% transparente
+                }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            callback(tempCanvas.toDataURL());
+        };
+        img.onerror = () => callback(null); // Fallback si falla
+        img.src = imgSource;
+    }
+
     // --- CANVAS LOGIC & ZOOM ---
     async function startDrawing(template) {
         state.currentTemplate = template;
         state.history = []; state.historyIndex = -1;
         setTool('pencil');
+        
         navigate('canvas');
         dom.overlay.innerHTML = '';
+        
         if (template.id !== 'blank') {
-            const img = new Image();
-            // --- AQUI ESTA LA MAGIA DEL BLEND-MODE ---
-            // 'blend-multiply' hace que lo blanco sea transparente
-            img.className = "w-full h-full object-contain pointer-events-none select-none blend-multiply";
-            img.src = template.type === 'svg' ? 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500" stroke="black" stroke-width="8" fill="none">${template.content}</svg>`) : template.file;
-            dom.overlay.appendChild(img);
+            if (template.type === 'svg') {
+                const img = new Image();
+                img.className = "w-full h-full object-contain pointer-events-none select-none";
+                img.src = 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500" stroke="black" stroke-width="8" fill="none">${template.content}</svg>`);
+                dom.overlay.appendChild(img);
+                setTimeout(() => saveHistory(), 100);
+            } else {
+                // Es una imagen PNG/JPG: Procesarla
+                dom.processing.classList.remove('hidden');
+                dom.processing.classList.add('flex');
+                
+                processImage(template.file, (cleanSrc) => {
+                    if (cleanSrc) {
+                        const img = new Image();
+                        img.className = "w-full h-full object-contain pointer-events-none select-none";
+                        img.src = cleanSrc; // Usar la versión limpia transparente
+                        // Guardar la versión limpia en el template temporalmente para guardar rápido
+                        state.currentTemplate.cleanSrc = cleanSrc; 
+                        dom.overlay.appendChild(img);
+                    }
+                    dom.processing.classList.add('hidden');
+                    dom.processing.classList.remove('flex');
+                    saveHistory();
+                });
+            }
+        } else {
+            setTimeout(() => saveHistory(), 100);
         }
+        
         renderPalette();
-        setTimeout(() => saveHistory(), 100);
         resetZoom();
     }
 
@@ -464,18 +522,18 @@
         const tempCanvas = document.createElement('canvas'); tempCanvas.width = dom.canvas.width; tempCanvas.height = dom.canvas.height; const tCtx = tempCanvas.getContext('2d');
         // 1. Dibujar pintura
         tCtx.drawImage(dom.canvas, 0, 0);
-        // 2. Dibujar plantilla con efecto Multiply
+        // 2. Dibujar plantilla SUPERPUESTA
         if (state.currentTemplate && state.currentTemplate.id !== 'blank') {
             const overlayImg = dom.overlay.querySelector('img');
             if (overlayImg) {
-                const i = new Image(); i.src = overlayImg.src; await new Promise(r => i.onload = r);
-                
-                tCtx.globalCompositeOperation = 'multiply'; // MAGIA PARA GUARDAR
+                const i = new Image(); 
+                // Usar la versión limpia si existe
+                i.src = state.currentTemplate.cleanSrc || overlayImg.src; 
+                await new Promise(r => i.onload = r);
                 
                 const s = 1; const ai = i.naturalWidth/i.naturalHeight; const ac = tempCanvas.width/tempCanvas.height;
                 let w,h; if(ai>ac){w=tempCanvas.width*s;h=w/ai}else{h=tempCanvas.height*s;w=h*ai}
                 tCtx.drawImage(i, (tempCanvas.width-w)/2, (tempCanvas.height-h)/2, w, h);
-                tCtx.globalCompositeOperation = 'source-over';
             }
         }
         const dataUrl = tempCanvas.toDataURL();
